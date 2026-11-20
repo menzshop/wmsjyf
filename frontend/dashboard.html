@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#1858c9">
+    <title>DASHBOARD - WMS</title>
+    <script src="theme.js"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="dashboard-body">
+
+    <div class="dashboard-layout">
+        <!-- SIDEBAR KIRI -->
+        <div class="sidebar">
+            <div class="sidebar-logo"><span class="brand-icon"><svg class="ico" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg></span><span>JYF WMS</span></div>
+            <ul class="sidebar-menu">
+                <li><a onclick="showPage('page-dashboard')" class="active" id="menu-dashboard"><svg class="ico" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg> DASHBOARD</a></li>
+                <li><a onclick="showPage('page-reports-bestseller')" id="menu-reports"><svg class="ico" viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg> REPORTS</a></li>
+
+                <li class="menu-label">TRANSAKSI MASUK</li>
+                <li><a onclick="showPage('page-masuk')" id="menu-masuk"><svg class="ico" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> BARANG MASUK</a></li>
+                <li><a onclick="showPage('page-return-masuk')" id="menu-return-masuk"><svg class="ico" viewBox="0 0 24 24"><polyline points="9 10 4 15 9 20"/><path d="M20 4v7a4 4 0 0 1-4 4H4"/></svg> RETURN MASUK</a></li>
+
+                <li class="menu-label">TRANSAKSI KELUAR</li>
+                <li><a onclick="showPage('page-keluar')" id="menu-keluar"><svg class="ico" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg> BARANG KELUAR</a></li>
+                <li><a onclick="showPage('page-return-keluar')" id="menu-return-keluar"><svg class="ico" viewBox="0 0 24 24"><polyline points="15 14 20 9 15 4"/><path d="M4 20v-7a4 4 0 0 1 4-4h12"/></svg> RETURN KELUAR</a></li>
+                <li><a onclick="showPage('page-affiliate')" id="menu-affiliate"><svg class="ico" viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg> AFFILIATE</a></li>
+                <li><a onclick="showPage('page-pengiriman-kilat')" id="menu-pengiriman-kilat"><svg class="ico" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> PENGIRIMAN KILAT</a></li>
+                <li><a onclick="showPage('page-reseller')" id="menu-reseller"><svg class="ico" viewBox="0 0 24 24"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg> RESELLER</a></li>
+
+                <li class="menu-admin"><a onclick="showPage('page-reports-product')" id="menu-product"><svg class="ico" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg> PRODUCT</a></li>
+                <li id="menu-kelola-akun" style="display: none;">
+                    <a onclick="showPage('page-kelola-akun')" id="menu-akun"><svg class="ico" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> KELOLA AKUN</a>
+                </li>
+                <li id="menu-log-aktivitas" style="display: none;">
+                    <a onclick="showPage('page-log')" id="menu-log"><svg class="ico" viewBox="0 0 24 24"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg> LOG AKTIVITAS</a>
+                </li>
+                <li id="menu-developer" style="display: none;">
+                    <a onclick="toggleDevMode()" id="menu-devmode"><svg class="ico" viewBox="0 0 24 24"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg> MODE DEVELOPER <span class="dev-state" id="devModeState">OFF</span></a>
+                </li>
+            </ul>
+        </div>
+        <div class="sidebar-overlay" onclick="closeSidebar()"></div>
+
+        <!-- KONTEN UTAMA -->
+        <div class="main-content">
+            <div class="topbar">
+                <div class="topbar-left">
+                    <button type="button" class="btn-menu" onclick="toggleSidebar()" aria-label="BUKA MENU"><svg class="ico" viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
+                    <span class="topbar-title">WAREHOUSE MANAGEMENT SYSTEM</span>
+                </div>
+                <div class="topbar-right">
+                    <div class="theme-switch" role="group" aria-label="PILIH TEMA">
+                        <button type="button" class="theme-opt" data-theme-set="light" onclick="setTheme('light')"><svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg><span>TERANG</span></button>
+                        <button type="button" class="theme-opt" data-theme-set="dark" onclick="setTheme('dark')"><svg class="ico" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg><span>GELAP</span></button>
+                    </div>
+                    <div class="user-info">
+                        <span class="user-chip"><svg class="ico" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg><span id="userName">-</span></span>
+                        <button class="btn-logout" onclick="logout()">LOGOUT</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="content-area">
+
+                <!-- HALAMAN 1: DASHBOARD UTAMA -->
+                <div id="page-dashboard" class="page-section active">
+                    <div class="sticky-header-dashboard">
+                        <div class="page-head"><div><h2>REKAP SISTEM GUDANG</h2><p class="page-sub">RINGKASAN STOK DAN AKTIVITAS PADA PERIODE TERPILIH</p></div></div>
+                        <div class="filter-bar">
+                            <label>FILTER TANGGAL</label>
+                            <input type="date" id="tglMulai">
+                            <span class="filter-sep">S/D</span>
+                            <input type="date" id="tglAkhir">
+                            <button class="btn btn-primary" onclick="muatDashboard()">TERAPKAN</button>
+                        </div>
+                    </div>
+                    <div class="dev-banner" id="devBanner" style="display:none;">MODE DEVELOPER AKTIF &mdash; KLIK <b>+ TAMBAH</b>, <b>EDIT</b>, ATAU <b>HAPUS</b> PADA KARTU RINCIAN DI BAWAH. PERUBAHAN LANGSUNG BERLAKU DI DASHBOARD DAN FORM SCAN.</div>
+
+                    <div class="kpi-grid">
+                        <div class="kpi tone-blue">
+                            <div class="kpi-top"><h3>TOTAL STOK SAAT INI</h3><span class="kpi-icon"><svg class="ico" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg></span></div>
+                            <div class="kpi-value" id="rekStokTotal">0</div>
+                        </div>
+                        <div class="kpi tone-amber">
+                            <div class="kpi-top"><h3>HPP</h3><span class="kpi-icon"><svg class="ico" viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></span></div>
+                            <div class="kpi-value is-currency" id="rekTotalAset">Rp 0</div>
+                        </div>
+                        <div class="kpi tone-green">
+                            <div class="kpi-top"><h3>TOTAL MASUK</h3><span class="kpi-icon"><svg class="ico" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></span></div>
+                            <div class="kpi-value" id="rekMasuk">0</div>
+                        </div>
+                        <div class="kpi tone-red">
+                            <div class="kpi-top"><h3>TOTAL KELUAR</h3><span class="kpi-icon"><svg class="ico" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></span></div>
+                            <div class="kpi-value" id="rekKeluar">0</div>
+                        </div>
+                        <div class="kpi tone-amber">
+                            <div class="kpi-top"><h3>RETURN MASUK</h3><span class="kpi-icon"><svg class="ico" viewBox="0 0 24 24"><polyline points="9 10 4 15 9 20"/><path d="M20 4v7a4 4 0 0 1-4 4H4"/></svg></span></div>
+                            <div class="kpi-value" id="rekReturnMasuk">0</div>
+                        </div>
+                        <div class="kpi tone-orange">
+                            <div class="kpi-top"><h3>RETURN KELUAR</h3><span class="kpi-icon"><svg class="ico" viewBox="0 0 24 24"><polyline points="15 14 20 9 15 4"/><path d="M4 20v-7a4 4 0 0 1 4-4h12"/></svg></span></div>
+                            <div class="kpi-value" id="rekReturnKeluar">0</div>
+                        </div>
+                        <div class="kpi tone-violet">
+                            <div class="kpi-top"><h3>AFFILIATE</h3><span class="kpi-icon"><svg class="ico" viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg></span></div>
+                            <div class="kpi-value" id="rekAffiliate">0</div>
+                        </div>
+                        <div class="kpi tone-red">
+                            <div class="kpi-top"><h3>PENGIRIMAN KILAT</h3><span class="kpi-icon"><svg class="ico" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></span></div>
+                            <div class="kpi-value" id="rekKilat">0</div>
+                            <div class="kpi-note">ORDERAN SHOPEE (SUDAH TERMASUK TOTAL KELUAR &amp; SHOPEE)</div>
+                        </div>
+                    </div>
+
+                    <div class="panel-grid" id="panelRincian"></div>
+                </div>
+
+                <!-- HALAMAN: REPORTS - PRODUCTS -->
+                <div id="page-reports-product" class="page-section">
+                    <div class="page-head"><div><h2>PRODUCT</h2><p class="page-sub">DAFTAR BARANG DAN STOK TERKINI</p></div></div>
+                    <div class="filter-bar">
+                        <label>DATA STOK TERKINI</label>
+                        <button class="btn btn-primary" onclick="muatTabelBarang()">MUAT ULANG DATA</button>
+                    </div>
+
+                    <div class="toolbar">
+                        <button class="btn btn-primary" onclick="exportExcel()"><svg class="ico" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> EXPORT EXCEL</button>
+                        <div id="adminButtons" class="toolbar">
+                            <button class="btn btn-success" onclick="openModalSO()"><svg class="ico" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg> UPLOAD HASIL SO</button>
+                            <button class="btn btn-primary" onclick="openModalImport()"><svg class="ico" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> IMPORT EXCEL</button>
+                            <button class="btn btn-success" onclick="openModalTambah()">+ TAMBAH PRODUK</button>
+                        </div>
+                    </div>
+
+                    <div class="search-container">
+                        <svg class="ico" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                        <input type="text" id="searchBarang" placeholder="CARI BERDASARKAN SKU ATAU NAMA ARTIKEL..." oninput="filterTabelBarang()">
+                    </div>
+
+                    <div class="table-card">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>SKU (BARCODE)</th>
+                                    <th>ARTIKEL</th>
+                                    <th>KATEGORI</th>
+                                    <th>SIZE</th>
+                                    <th>STOK</th>
+                                    <th>HPP</th>
+                                    <th>AKSI</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabelDataBarang">
+                                <tr><td colspan="7" class="row-note">MEMUAT DATA...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="table-footer">
+                        <div class="limit-box">
+                            <span>TAMPILKAN</span>
+                            <select id="limitBarang" onchange="ubahLimitBarang()">
+                                <option value="20">20 BARIS</option>
+                                <option value="50" selected>50 BARIS</option>
+                                <option value="100">100 BARIS</option>
+                            </select>
+                        </div>
+                        <div id="paginationBarang" class="pagination"></div>
+                    </div>
+                </div>
+
+                <!-- HALAMAN: REPORTS - BEST SELLER -->
+                <div id="page-reports-bestseller" class="page-section">
+                    <div class="report-sticky-header">
+                        <h2>REPORTS</h2>
+                        <div class="reports-tabs-container">
+                            <div class="reports-tab active" id="tab-bestseller" onclick="showPage('page-reports-bestseller')">BEST SELLER</div>
+                            <div class="reports-tab" id="tab-outlet" onclick="showPage('page-reports-outlet')">OUTLET</div>
+                            <div class="reports-tab" id="tab-compare" onclick="showPage('page-reports-compare')">COMPARE</div>
+                            <div class="reports-tab" id="tab-daily" onclick="showPage('page-reports-daily')">DAILY</div>
+                            <div class="reports-tab" id="tab-monthly" onclick="showPage('page-reports-monthly')">MONTHLY</div>
+                        </div>
+                        <div class="filter-bar">
+                            <label>FILTER TANGGAL</label>
+                            <input type="date" id="tglBestSellerMulai">
+                            <span class="filter-sep">S/D</span>
+                            <input type="date" id="tglBestSellerAkhir">
+                            <button class="btn btn-primary" onclick="muatLaporanBestSeller()">TERAPKAN</button>
+                        </div>
+                    </div>
+
+                    <div class="table-card scroll report-body">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th class="ta-c w-no">NO</th>
+                                    <th class="ta-l">NAME</th>
+                                    <th class="ta-r">QTY</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabelBestSeller">
+                                <tr><td colspan="3" class="row-note">MEMUAT DATA...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- HALAMAN: REPORTS - OUTLET -->
+                <div id="page-reports-outlet" class="page-section">
+                    <div class="report-sticky-header">
+                        <h2>REPORTS</h2>
+                        <div class="reports-tabs-container">
+                            <div class="reports-tab" id="tab-bestseller" onclick="showPage('page-reports-bestseller')">BEST SELLER</div>
+                            <div class="reports-tab active" id="tab-outlet" onclick="showPage('page-reports-outlet')">OUTLET</div>
+                            <div class="reports-tab" id="tab-compare" onclick="showPage('page-reports-compare')">COMPARE</div>
+                            <div class="reports-tab" id="tab-daily" onclick="showPage('page-reports-daily')">DAILY</div>
+                            <div class="reports-tab" id="tab-monthly" onclick="showPage('page-reports-monthly')">MONTHLY</div>
+                        </div>
+                        <div class="filter-bar">
+                            <label>FILTER TANGGAL</label>
+                            <input type="date" id="tglOutletMulai">
+                            <span class="filter-sep">S/D</span>
+                            <input type="date" id="tglOutletAkhir">
+                            <button class="btn btn-primary" onclick="muatLaporanOutlet()">TERAPKAN</button>
+                        </div>
+                    </div>
+
+                    <div class="table-card report-body">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th class="ta-c w-no">NO</th>
+                                    <th>MARKETPLACE</th>
+                                    <th class="ta-r">QTY</th>
+                                    <th class="ta-r">HPP</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabelOutlet">
+                                <tr><td colspan="4" class="row-note">MEMUAT DATA...</td></tr>
+                            </tbody>
+                            <tfoot id="footerOutlet" style="display: none;">
+                                <tr>
+                                    <td colspan="2" class="ta-r">TOTAL</td>
+                                    <td id="totalOutletQty" class="ta-r num accent-text">0</td>
+                                    <td id="totalOutletHpp" class="ta-r num accent-text">Rp 0</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- HALAMAN: REPORTS - COMPARE -->
+                <div id="page-reports-compare" class="page-section">
+                    <div class="report-sticky-header">
+                        <h2>REPORTS</h2>
+                        <div class="reports-tabs-container">
+                            <div class="reports-tab" id="tab-bestseller" onclick="showPage('page-reports-bestseller')">BEST SELLER</div>
+                            <div class="reports-tab" id="tab-outlet" onclick="showPage('page-reports-outlet')">OUTLET</div>
+                            <div class="reports-tab active" id="tab-compare" onclick="showPage('page-reports-compare')">COMPARE</div>
+                            <div class="reports-tab" id="tab-daily" onclick="showPage('page-reports-daily')">DAILY</div>
+                            <div class="reports-tab" id="tab-monthly" onclick="showPage('page-reports-monthly')">MONTHLY</div>
+                        </div>
+                        <div class="filter-bar">
+                            <div class="filter-group">
+                                <label>DATE 1</label>
+                                <input type="date" id="cmpStart1">
+                                <span class="filter-sep">S/D</span>
+                                <input type="date" id="cmpEnd1">
+                            </div>
+                            <div class="filter-group">
+                                <label>COMPARE WITH</label>
+                                <input type="date" id="cmpStart2">
+                                <span class="filter-sep">S/D</span>
+                                <input type="date" id="cmpEnd2">
+                            </div>
+                            <button class="btn btn-primary" onclick="muatLaporanCompare()">COMPARE</button>
+                        </div>
+                    </div>
+
+                    <div class="table-card report-body">
+                        <table class="compare">
+                            <thead>
+                                <tr>
+                                    <th rowspan="2" class="cmp-store" style="width: 28%;">STORE</th>
+                                    <th id="headerDate1">PERIODE 1</th>
+                                    <th id="headerDate2">PERIODE 2</th>
+                                    <th rowspan="2" style="width: 24%;" aria-label="PERSENTASE" title="PERSENTASE"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><line x1="19" y1="5" x2="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg></th>
+                                </tr>
+                                <tr>
+                                    <th>QTY</th>
+                                    <th>QTY</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td class="cmp-store">JYF FOOTWEAR</td>
+                                    <td class="cmp-value" id="cmpQty1">0</td>
+                                    <td class="cmp-value" id="cmpQty2">0</td>
+                                    <td class="cmp-value" id="cmpRevenue">0%</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- HALAMAN: REPORTS - DAILY -->
+                <div id="page-reports-daily" class="page-section">
+                    <div class="report-sticky-header">
+                        <h2>REPORTS</h2>
+                        <div class="reports-tabs-container">
+                            <div class="reports-tab" id="tab-bestseller" onclick="showPage('page-reports-bestseller')">BEST SELLER</div>
+                            <div class="reports-tab" id="tab-outlet" onclick="showPage('page-reports-outlet')">OUTLET</div>
+                            <div class="reports-tab" id="tab-compare" onclick="showPage('page-reports-compare')">COMPARE</div>
+                            <div class="reports-tab active" id="tab-daily" onclick="showPage('page-reports-daily')">DAILY</div>
+                            <div class="reports-tab" id="tab-monthly" onclick="showPage('page-reports-monthly')">MONTHLY</div>
+                        </div>
+                        <div class="filter-bar">
+                            <label>FILTER TANGGAL</label>
+                            <input type="date" id="tglDailyMulai">
+                            <span class="filter-sep">S/D</span>
+                            <input type="date" id="tglDailyAkhir">
+                            <button class="btn btn-primary" onclick="muatLaporanDaily()">TERAPKAN</button>
+                        </div>
+                    </div>
+
+                    <div class="table-card scroll report-body">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th class="ta-c">DATE</th>
+                                    <th class="ta-c">DAY</th>
+                                    <th class="ta-c">QTY</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabelDaily">
+                                <tr><td colspan="3" class="row-note">MEMUAT DATA...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- HALAMAN: REPORTS - MONTHLY -->
+                <div id="page-reports-monthly" class="page-section">
+                    <div class="report-sticky-header">
+                        <h2>REPORTS</h2>
+                        <div class="reports-tabs-container">
+                            <div class="reports-tab" id="tab-bestseller" onclick="showPage('page-reports-bestseller')">BEST SELLER</div>
+                            <div class="reports-tab" id="tab-outlet" onclick="showPage('page-reports-outlet')">OUTLET</div>
+                            <div class="reports-tab" id="tab-compare" onclick="showPage('page-reports-compare')">COMPARE</div>
+                            <div class="reports-tab" id="tab-daily" onclick="showPage('page-reports-daily')">DAILY</div>
+                            <div class="reports-tab active" id="tab-monthly" onclick="showPage('page-reports-monthly')">MONTHLY</div>
+                        </div>
+                        <div class="filter-bar">
+                            <label>FILTER TANGGAL</label>
+                            <input type="date" id="tglMonthlyMulai">
+                            <span class="filter-sep">S/D</span>
+                            <input type="date" id="tglMonthlyAkhir">
+                            <button class="btn btn-primary" onclick="muatLaporanMonthly()">TERAPKAN</button>
+                        </div>
+                    </div>
+
+                    <div class="table-card scroll report-body">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th class="ta-c">MONTH</th>
+                                    <th class="ta-c">QTY</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabelMonthly">
+                                <tr><td colspan="2" class="row-note">MEMUAT DATA...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- HALAMAN: SCAN BARANG MASUK -->
+                <div id="page-masuk" class="page-section">
+                    <div class="page-head"><div><h2>SCAN BARANG MASUK</h2></div></div>
+                    <div class="scan-full-container">
+                        <div class="scan-panel-left tone-blue">
+                            <div class="scan-input-area">
+                                <div class="scan-fields">
+                                    <div class="field">
+                                        <label for="tglMasuk">TANGGAL TRANSAKSI</label>
+                                        <input type="date" id="tglMasuk">
+                                    </div>
+                                <div class="field">
+                                    <label for="vendorMasuk">PILIH VENDOR ASAL</label>
+                                    <select id="vendorMasuk"></select>
+                                </div>
+                                </div>
+                                <p class="scan-hint">SCAN BARCODE / KETIK SKU</p>
+                                <input type="text" class="scan-input" id="scanMasuk" placeholder="KETIK SKU..." autocomplete="off" oninput="handleScan(event, 'masuk')" onkeypress="if(event.key==='Enter') handleScan(event, 'masuk')" autofocus>
+                            </div>
+                            <ul class="scan-list-area" id="riwayatScanMasuk"></ul>
+                            <div class="btn-simpan-bottom">
+                                <button class="btn btn-primary" onclick="simpanKeranjang('masuk')"><svg class="ico" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> SIMPAN SEMUA BARANG MASUK</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- HALAMAN: SCAN RETURN MASUK -->
+                <div id="page-return-masuk" class="page-section">
+                    <div class="page-head"><div><h2>SCAN RETURN MASUK</h2></div></div>
+                    <div class="scan-full-container">
+                        <div class="scan-panel-left tone-green">
+                            <div class="scan-input-area">
+                                <div class="scan-fields">
+                                    <div class="field">
+                                        <label for="tglReturnMasuk">TANGGAL TRANSAKSI</label>
+                                        <input type="date" id="tglReturnMasuk">
+                                    </div>
+                                <div class="field">
+                                    <label for="alasanReturnMasuk">PILIH ALASAN RETURN</label>
+                                    <select id="alasanReturnMasuk"></select>
+                                </div>
+                                </div>
+                                <p class="scan-hint">SCAN BARCODE / KETIK SKU</p>
+                                <input type="text" class="scan-input" id="scanReturnMasuk" placeholder="KETIK SKU..." autocomplete="off" oninput="handleScan(event, 'return-masuk')" onkeypress="if(event.key==='Enter') handleScan(event, 'return-masuk')">
+                            </div>
+                            <ul class="scan-list-area" id="riwayatScanReturn-masuk"></ul>
+                            <div class="btn-simpan-bottom">
+                                <button class="btn btn-success" onclick="simpanKeranjang('return-masuk')"><svg class="ico" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> SIMPAN RETURN MASUK</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- HALAMAN: SCAN BARANG KELUAR -->
+                <div id="page-keluar" class="page-section">
+                    <div class="page-head"><div><h2>SCAN BARANG KELUAR</h2></div></div>
+                    <div class="scan-full-container">
+                        <div class="scan-panel-left tone-red">
+                            <div class="scan-input-area">
+                                <div class="scan-fields">
+                                    <div class="field">
+                                        <label for="tglKeluar">TANGGAL TRANSAKSI</label>
+                                        <input type="date" id="tglKeluar">
+                                    </div>
+                                <div class="field">
+                                    <label for="marketplaceKeluar">PILIH AKUN/MARKETPLACE TUJUAN</label>
+                                    <select id="marketplaceKeluar"></select>
+                                </div>
+                                </div>
+                                <p class="scan-hint">SCAN BARCODE / KETIK SKU</p>
+                                <input type="text" class="scan-input" id="scanKeluar" placeholder="KETIK SKU..." autocomplete="off" oninput="handleScan(event, 'keluar')" onkeypress="if(event.key==='Enter') handleScan(event, 'keluar')">
+                            </div>
+                            <ul class="scan-list-area" id="riwayatScanKeluar"></ul>
+                            <div class="btn-simpan-bottom">
+                                <button class="btn btn-danger" onclick="simpanKeranjang('keluar')"><svg class="ico" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> SIMPAN BARANG KELUAR</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- HALAMAN: SCAN RETURN KELUAR -->
+                <div id="page-return-keluar" class="page-section">
+                    <div class="page-head"><div><h2>SCAN RETURN KELUAR</h2></div></div>
+                    <div class="scan-full-container">
+                        <div class="scan-panel-left tone-orange">
+                            <div class="scan-input-area">
+                                <div class="scan-fields">
+                                    <div class="field">
+                                        <label for="tglReturnKeluar">TANGGAL TRANSAKSI</label>
+                                        <input type="date" id="tglReturnKeluar">
+                                    </div>
+                                <div class="field">
+                                    <label for="alasanReturnKeluar">PILIH ALASAN RETURN</label>
+                                    <select id="alasanReturnKeluar"></select>
+                                </div>
+                                </div>
+                                <p class="scan-hint">SCAN BARCODE / KETIK SKU</p>
+                                <input type="text" class="scan-input" id="scanReturnKeluar" placeholder="KETIK SKU..." autocomplete="off" oninput="handleScan(event, 'return-keluar')" onkeypress="if(event.key==='Enter') handleScan(event, 'return-keluar')">
+                            </div>
+                            <ul class="scan-list-area" id="riwayatScanReturn-keluar"></ul>
+                            <div class="btn-simpan-bottom">
+                                <button class="btn btn-primary btn-tone-orange" onclick="simpanKeranjang('return-keluar')"><svg class="ico" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> SIMPAN RETURN KELUAR</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- HALAMAN: SCAN AFFILIATE -->
+                <div id="page-affiliate" class="page-section">
+                    <div class="page-head"><div><h2>SCAN AFFILIATE</h2></div></div>
+                    <div class="scan-full-container">
+                        <div class="scan-panel-left tone-violet">
+                            <div class="scan-input-area">
+                                <div class="scan-fields">
+                                    <div class="field">
+                                        <label for="tglAffiliate">TANGGAL TRANSAKSI</label>
+                                        <input type="date" id="tglAffiliate">
+                                    </div>
+                                <div class="field" id="fieldAffiliate" style="display:none;">
+                                    <label for="affiliateTujuan">PILIH AKUN AFFILIATE</label>
+                                    <select id="affiliateTujuan"></select>
+                                </div>
+                                </div>
+                                <p class="scan-hint">SCAN BARCODE / KETIK SKU</p>
+                                <input type="text" class="scan-input" id="scanAffiliate" placeholder="KETIK SKU..." autocomplete="off" oninput="handleScan(event, 'affiliate')" onkeypress="if(event.key==='Enter') handleScan(event, 'affiliate')">
+                            </div>
+                            <ul class="scan-list-area" id="riwayatScanAffiliate"></ul>
+                            <div class="btn-simpan-bottom">
+                                <button class="btn btn-primary btn-tone-violet" onclick="simpanKeranjang('affiliate')"><svg class="ico" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> SIMPAN AFFILIATE</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- HALAMAN: SCAN PENGIRIMAN KILAT -->
+                <div id="page-pengiriman-kilat" class="page-section">
+                    <div class="page-head"><div><h2>SCAN PENGIRIMAN KILAT</h2></div></div>
+                    <div class="scan-full-container">
+                        <div class="scan-panel-left tone-red">
+                            <div class="scan-input-area">
+                                <div class="scan-fields">
+                                    <div class="field">
+                                        <label for="tglPengirimanKilat">TANGGAL TRANSAKSI</label>
+                                        <input type="date" id="tglPengirimanKilat">
+                                    </div>
+                                </div>
+                                <p class="scan-hint">ORDERAN SHOPEE &mdash; OTOMATIS TERCATAT SEBAGAI BARANG KELUAR (SHOPEE)</p>
+                                <p class="scan-hint">SCAN BARCODE / KETIK SKU</p>
+                                <input type="text" class="scan-input" id="scanPengirimanKilat" placeholder="KETIK SKU..." autocomplete="off" oninput="handleScan(event, 'pengiriman-kilat')" onkeypress="if(event.key==='Enter') handleScan(event, 'pengiriman-kilat')">
+                            </div>
+                            <ul class="scan-list-area" id="riwayatScanPengiriman-kilat"></ul>
+                            <div class="btn-simpan-bottom">
+                                <button class="btn btn-danger" onclick="simpanKeranjang('pengiriman-kilat')"><svg class="ico" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> SIMPAN PENGIRIMAN KILAT</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- HALAMAN: SCAN RESELLER -->
+                <div id="page-reseller" class="page-section">
+                    <div class="page-head"><div><h2>SCAN RESELLER</h2></div></div>
+                    <div class="scan-full-container">
+                        <div class="scan-panel-left tone-teal">
+                            <div class="scan-input-area">
+                                <div class="scan-fields">
+                                    <div class="field">
+                                        <label for="tglReseller">TANGGAL TRANSAKSI</label>
+                                        <input type="date" id="tglReseller">
+                                    </div>
+                                <div class="field">
+                                    <label for="resellerTujuan">PILIH AKUN RESELLER</label>
+                                    <select id="resellerTujuan"></select>
+                                </div>
+                                </div>
+                                <p class="scan-hint">SCAN BARCODE / KETIK SKU</p>
+                                <input type="text" class="scan-input" id="scanReseller" placeholder="KETIK SKU..." autocomplete="off" oninput="handleScan(event, 'reseller')" onkeypress="if(event.key==='Enter') handleScan(event, 'reseller')">
+                            </div>
+                            <ul class="scan-list-area" id="riwayatScanReseller"></ul>
+                            <div class="btn-simpan-bottom">
+                                <button class="btn btn-primary btn-tone-teal" onclick="simpanKeranjang('reseller')"><svg class="ico" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> SIMPAN RESELLER</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- HALAMAN: KELOLA AKUN (ADMIN) -->
+                <div id="page-kelola-akun" class="page-section">
+                    <div class="page-head">
+                        <div><h2>KELOLA AKUN STAFF</h2><p class="page-sub">DAFTAR AKUN DAN HAK AKSES PENGGUNA</p></div>
+                        <button class="btn btn-primary" onclick="openModalUser()">+ TAMBAH AKUN BARU</button>
+                    </div>
+                    <div class="table-card">
+                        <table>
+                            <thead>
+                                <tr><th>ID</th><th>USERNAME</th><th>ROLE (HAK AKSES)</th><th>AKSI</th></tr>
+                            </thead>
+                            <tbody id="tabelUsers">
+                                <tr><td colspan="4" class="row-note">MEMUAT DATA...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- HALAMAN: LOG AKTIVITAS (ADMIN) -->
+                <div id="page-log" class="page-section">
+                    <div class="page-head"><div><h2>LOG AKTIVITAS SISTEM</h2><p class="page-sub">MAKSIMAL 500 AKTIVITAS TERAKHIR.</p></div></div>
+                    <div class="table-card scroll">
+                        <table>
+                            <thead>
+                                <tr><th>WAKTU</th><th>USER</th><th>AKSI</th><th>KETERANGAN</th></tr>
+                            </thead>
+                            <tbody id="tabelLog">
+                                <tr><td colspan="4" class="row-note">MEMUAT DATA...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Upload SO -->
+    <div class="modal" id="modalSO">
+        <div class="modal-content">
+            <h3>UPLOAD HASIL STOCK OPNAME (SO)</h3>
+            <p class="modal-note">
+                FORMAT EXCEL (.XLSX): <b>SKU, ARTIKETL, KATEGORI, STOK, HPP</b>.
+                <span class="warn">PERINGATAN: FITUR INI AKAN MENIMPA STOK SESUAI FILE.</span>
+            </p>
+            <div class="input-group">
+                <input type="file" id="fileSo" accept=".xlsx, .xls">
+            </div>
+            <div id="soResult" class="result-box" style="display:none;"></div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="closeModalSO()">BATAL</button>
+                <button class="btn btn-success" id="btnUploadSo" onclick="uploadSo()">MULAI SINKRONISASI STOK</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Import CSV -->
+    <div class="modal" id="modalImport">
+        <div class="modal-content">
+            <h3>IMPORT DATA BARANG BARU (EXCEL)</h3>
+            <p class="modal-note">
+                FORMAT EXCEL (.XLSX): <b>SKU, ARTIKETL, KATEGORI, STOK, HPP</b>.
+            </p>
+            <div class="input-group">
+                <input type="file" id="fileCsv" accept=".xlsx, .xls">
+            </div>
+            <div id="importResult" class="result-box" style="display:none;"></div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="closeModalImport()">BATAL</button>
+                <button class="btn btn-primary" id="btnUpload" onclick="uploadCsv()">UPLOAD &amp; PROSES</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Tambah Produk Manual -->
+    <div class="modal" id="modalTambah">
+        <div class="modal-content">
+            <h3>TAMBAH PRODUK MANUAL</h3>
+            <div class="input-group"><label>SKU / BARCODE</label><input type="text" id="addSku"></div>
+            <div class="input-group"><label>NAMA ARTIKEL</label><input type="text" id="addArtikel"></div>
+            <div class="input-group"><label>KATEGORI (CTH: SEPATU)</label><input type="text" id="addKategori"></div>
+            <div class="input-group"><label>SIZE (JIKA SEPATU)</label><input type="text" id="addSize" placeholder="KOSONGKAN JIKA TIDAK ADA"></div>
+            <div class="input-group"><label>STOK AWAL</label><input type="number" id="addStok" value="0"></div>
+            <div class="input-group"><label>HPP (HARGA POKOK)</label><input type="number" id="addHpp" value="0"></div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="closeModalTambah()">BATAL</button>
+                <button class="btn btn-primary" onclick="simpanProdukManual()">SIMPAN PRODUK</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Tambah User -->
+    <div class="modal" id="modalUser">
+        <div class="modal-content">
+            <h3>TAMBAH AKUN STAFF BARU</h3>
+            <div class="input-group"><label>USERNAME (HURUF KECIL TANPA SPASI)</label><input type="text" id="userBaruUsername"></div>
+            <div class="input-group"><label>PASSWORD</label><input type="text" id="userBaruPassword"></div>
+            <div class="input-group">
+                <label>ROLE (HAK AKSES)</label>
+                <select id="userBaruRole">
+                    <option value="staff">STAFF (HANYA BISA SCAN)</option>
+                    <option value="admin">ADMIN (AKSES PENUH)</option>
+                </select>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="closeModalUser()">BATAL</button>
+                <button class="btn btn-primary" onclick="simpanUser()">SIMPAN AKUN</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
