@@ -8,8 +8,8 @@ const xlsx = require('xlsx');
 const db = require('./database');
 
 const app = express();
-const PORT = 3000;
-const JWT_SECRET = 'jyfteam-secret-key-2026';
+const PORT = process.env.PORT || 3000;
+const JWT_SECRET = process.env.JWT_SECRET;
 
 app.use(cors());
 app.use(express.json());
