@@ -1,4 +1,4 @@
-const API_URL = 'http://localhost:3000/api';
+const API_URL = 'https://wmsjyf-production.up.railway.app/api';
 
 // LOGIN HANDLER
 const loginForm = document.getElementById('loginForm');
