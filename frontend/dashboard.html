@@ -76,7 +76,7 @@
                             <button class="btn btn-primary" onclick="muatDashboard()">TERAPKAN</button>
                         </div>
                     </div>
-                    <div class="dev-banner" id="devBanner" style="display:none;">MODE DEVELOPER AKTIF &mdash; KLIK <b>+ TAMBAH</b>, <b>EDIT</b>, ATAU <b>HAPUS</b> PADA KARTU RINCIAN DI BAWAH. PERUBAHAN LANGSUNG BERLAKU DI DASHBOARD DAN FORM SCAN.</div>
+                    <div class="dev-banner" id="devBanner" style="display:none;">MODE DEVELOPER AKTIF &mdash; KLIK <b>+ TAMBAH</b>, <b>EDIT</b>, ATAU <b>HAPUS</b> PADA KARTU RINCIAN DI BAWAH. PERUBAHAN LANGSUNG BERLAKU DI DASHBOARD DAN FORM SCAN.<div style="margin-top:10px;"><button type="button" class="btn btn-danger btn-sm" onclick="openModalResetData()">HAPUS SEMUA DATA (MULAI ULANG)</button></div></div>
 
                     <div class="kpi-grid">
                         <div class="kpi tone-blue">
@@ -645,6 +645,31 @@
         </div>
     </div>
 
+    <!-- Modal Hapus Semua Data -->
+    <div class="modal" id="modalReset">
+        <div class="modal-content">
+            <h3>HAPUS SEMUA DATA</h3>
+            <p class="modal-note">
+                AKAN DIHAPUS PERMANEN: <b>SEMUA RIWAYAT TRANSAKSI</b> (MASUK, KELUAR, RETURN, AFFILIATE, KILAT, RESELLER) DAN <b>SEMUA STOK DIRESET KE 0</b>.
+                AKUN, DAFTAR VENDOR/MARKETPLACE/RESELLER, DAN LOG AKTIVITAS TIDAK IKUT TERHAPUS.
+                <span class="warn">TIDAK BISA DIBATALKAN. DISARANKAN EXPORT EXCEL DI MENU PRODUCT SEBAGAI CADANGAN SEBELUMNYA.</span>
+            </p>
+            <label style="display:flex;gap:8px;align-items:flex-start;font-size:12px;letter-spacing:0.04em;margin-bottom:16px;">
+                <input type="checkbox" id="resetHapusBarang" style="margin-top:2px;">
+                <span>HAPUS JUGA DATA BARANG (SKU, ARTIKEL, HPP). JIKA TIDAK DICENTANG, DATA BARANG TETAP ADA DENGAN STOK 0.</span>
+            </label>
+            <div class="input-group">
+                <label>KETIK <b>HAPUS SEMUA</b> UNTUK MELANJUTKAN</label>
+                <input type="text" id="resetKonfirmasi" autocomplete="off" placeholder="HAPUS SEMUA">
+            </div>
+            <div id="resetResult" class="result-box" style="display:none;"></div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="closeModalResetData()">BATAL</button>
+                <button class="btn btn-danger" id="btnReset" onclick="resetSemuaData()">HAPUS SEMUA DATA</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal Upload Excel Transaksi -->
     <div class="modal" id="modalUploadTrx">
         <div class="modal-content">
@@ -705,6 +730,6 @@
         </div>
     </div>
 
-    <script src="app.js?v=3"></script>
+    <script src="app.js?v=4"></script>
 </body>
 </html>

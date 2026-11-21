@@ -955,6 +955,33 @@ async function uploadTransaksi() {
     } finally { btn.disabled = false; btn.textContent = 'UPLOAD & SIMPAN'; }
 }
 
+// HAPUS SEMUA DATA (MODE DEVELOPER)
+function openModalResetData() {
+    document.getElementById('resetKonfirmasi').value = '';
+    document.getElementById('resetHapusBarang').checked = false;
+    document.getElementById('resetResult').style.display = 'none';
+    document.getElementById('modalReset').classList.add('active');
+}
+function closeModalResetData() { document.getElementById('modalReset').classList.remove('active'); }
+
+async function resetSemuaData() {
+    const box = document.getElementById('resetResult');
+    const btn = document.getElementById('btnReset');
+    if (document.getElementById('resetKonfirmasi').value.trim().toUpperCase() !== 'HAPUS SEMUA') return alert('KETIK "HAPUS SEMUA" DENGAN BENAR UNTUK MELANJUTKAN!');
+    const hapusBarang = document.getElementById('resetHapusBarang').checked;
+    if (!confirm(hapusBarang ? 'YAKIN? SEMUA TRANSAKSI DAN DATA BARANG AKAN DIHAPUS PERMANEN!' : 'YAKIN? SEMUA TRANSAKSI AKAN DIHAPUS DAN STOK DIRESET KE 0!')) return;
+    btn.disabled = true; btn.textContent = 'MENGHAPUS...';
+    try {
+        const res = await apiFetch('/reset-data', { method: 'POST', body: JSON.stringify({ konfirmasi: 'HAPUS SEMUA', hapus_barang: hapusBarang }) });
+        if (!res) return;
+        box.style.display = 'block'; box.className = 'result-box ' + (res.success ? 'ok' : 'err');
+        box.innerHTML = `<strong>${res.success ? 'BERHASIL:' : 'GAGAL:'} ${esc(res.message || '')}</strong>`;
+        if (res.success) { muatDashboard(); muatTabelBarang(); }
+    } catch (err) {
+        box.className = 'result-box err'; box.style.display = 'block'; box.textContent = 'GAGAL MENGHAPUS DATA.';
+    } finally { btn.disabled = false; btn.textContent = 'HAPUS SEMUA DATA'; }
+}
+
 // EXPORT EXCEL
 async function exportExcel() {
     try {
@@ -1030,7 +1057,7 @@ async function muatTabelLog() {
         let badgeClass = 'badge-log-def';
         
         if (l.aksi === 'TRANSAKSI') { badgeClass = 'badge-log-trx'; }
-        else if (l.aksi === 'HAPUS BARANG') { badgeClass = 'badge-log-del'; }
+        else if (l.aksi === 'HAPUS BARANG' || l.aksi === 'HAPUS SEMUA DATA') { badgeClass = 'badge-log-del'; }
         else if (l.aksi === 'IMPORT EXCEL' || l.aksi === 'UPLOAD SO' || l.aksi === 'UPLOAD TRANSAKSI') { badgeClass = 'badge-log-imp'; }
         else if (l.aksi === 'TAMBAH RINCIAN' || l.aksi === 'EDIT RINCIAN') { badgeClass = 'badge-log-imp'; }
         else if (l.aksi === 'HAPUS RINCIAN') { badgeClass = 'badge-log-del'; }
