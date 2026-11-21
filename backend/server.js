@@ -209,6 +209,22 @@ app.post('/api/transaksi', authMiddleware, (req, res) => {
   res.json({ success: true, stok_baru: newStok });
 });
 
+// ============ HAPUS SEMUA DATA (MODE DEVELOPER, ADMIN) ============
+// Menghapus semua riwayat transaksi & mereset stok. Akun, rincian (vendor/marketplace/dll) dan log aktivitas tetap ada.
+app.post('/api/reset-data', authMiddleware, adminMiddleware, (req, res) => {
+  if (req.body.konfirmasi !== 'HAPUS SEMUA') return res.status(400).json({ success: false, message: 'Konfirmasi tidak sesuai' });
+  const hapusBarang = req.body.hapus_barang === true;
+  let jmlTrx = 0, jmlBarang = 0;
+  db.transaction(() => {
+    jmlTrx = db.prepare('DELETE FROM transaksi').run().changes;
+    if (hapusBarang) jmlBarang = db.prepare('DELETE FROM barang').run().changes;
+    else jmlBarang = db.prepare('UPDATE barang SET stok = 0').run().changes;
+  })();
+  catatLog(req.user.id, req.user.username, 'HAPUS SEMUA DATA',
+    `${jmlTrx} transaksi dihapus; ` + (hapusBarang ? `${jmlBarang} data barang dihapus` : `stok ${jmlBarang} barang direset ke 0`));
+  res.json({ success: true, message: `Selesai: ${jmlTrx} transaksi dihapus, ` + (hapusBarang ? `${jmlBarang} data barang dihapus.` : `stok ${jmlBarang} barang direset ke 0.`) });
+});
+
 // ============ UPLOAD EXCEL TRANSAKSI ============
 // Template kosong (hanya judul kolom) untuk tiap halaman transaksi
 app.get('/api/template-transaksi/:tipe', authMiddleware, (req, res) => {
