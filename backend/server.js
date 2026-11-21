@@ -6,6 +6,7 @@ const multer = require('multer');
 const fs = require('fs');
 const xlsx = require('xlsx');
 const db = require('./database');
+const { KONFIG, kolomTemplate, prosesTransaksiExcel } = require('./transaksi-excel');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -15,6 +16,7 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static('../frontend'));
 const upload = multer({ dest: 'uploads/' });
+const uploadMemori = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
 // ============ AUTH ============
 app.post('/api/login', (req, res) => {
@@ -207,6 +209,99 @@ app.post('/api/transaksi', authMiddleware, (req, res) => {
   res.json({ success: true, stok_baru: newStok });
 });
 
+// ============ UPLOAD EXCEL TRANSAKSI ============
+// Template kosong (hanya judul kolom) untuk tiap halaman transaksi
+app.get('/api/template-transaksi/:tipe', authMiddleware, (req, res) => {
+  const tipe = req.params.tipe;
+  const k = KONFIG[tipe];
+  if (!k) return res.status(404).json({ success: false, message: 'Tipe transaksi tidak dikenal' });
+  const kolom = kolomTemplate(tipe);
+  const ws = xlsx.utils.aoa_to_sheet([kolom]);
+  ws['!cols'] = kolom.map(c => ({ wch: c === 'artikel' ? 36 : 16 }));
+  const petunjuk = [
+    ['PETUNJUK UPLOAD ' + k.label],
+    ['1. Isi data mulai baris ke-2 pada sheet "Data". Jangan ubah judul kolom.'],
+    ['2. tanggal : format 2026-11-21 atau 21/11/2026.'],
+    ['3. barcode : harus sama dengan SKU/barcode di data barang. Jika barcode berupa angka panjang, ubah format kolom menjadi Text.'],
+    ['4. artikel : pelengkap saja, yang dipakai sistem adalah barcode.'],
+    ['5. qty : angka bulat minimal 1.']
+  ];
+  if (k.detail === 'vendor') petunjuk.push(['6. vendor : cukup tulis nama vendornya, misal OYOD (sistem otomatis menjadi VENDOR OYOD). Nama harus sudah terdaftar.']);
+  else if (k.detail) petunjuk.push([`6. ${k.detail} : nama harus sudah terdaftar di Mode Developer.`]);
+  petunjuk.push(['Jika ada 1 baris salah, seluruh file ditolak (tidak ada data yang tersimpan) dan daftar kesalahannya ditampilkan.']);
+  const wb = xlsx.utils.book_new();
+  xlsx.utils.book_append_sheet(wb, ws, 'Data');
+  const wsP = xlsx.utils.aoa_to_sheet(petunjuk);
+  wsP['!cols'] = [{ wch: 110 }];
+  xlsx.utils.book_append_sheet(wb, wsP, 'Petunjuk');
+  const buffer = xlsx.write(wb, { type: 'buffer', bookType: 'xlsx' });
+  res.setHeader('Content-Disposition', `attachment; filename="Template_${tipe}.xlsx"`);
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.send(buffer);
+});
+
+app.post('/api/upload-transaksi/:tipe', authMiddleware,
+  (req, res, next) => uploadMemori.single('file')(req, res, err => {
+    if (err) return res.status(400).json({ success: false, message: err.code === 'LIMIT_FILE_SIZE' ? 'File terlalu besar (maksimal 5 MB)' : 'Gagal membaca file' });
+    next();
+  }),
+  (req, res) => {
+    const tipe = req.params.tipe;
+    const k = KONFIG[tipe];
+    if (!k) return res.status(404).json({ success: false, message: 'Tipe transaksi tidak dikenal' });
+    if (!req.file) return res.status(400).json({ success: false, message: 'File tidak ditemukan' });
+    if (!/\.(xlsx|xls|csv)$/i.test(req.file.originalname || '')) {
+      return res.status(400).json({ success: false, message: 'Gunakan file Excel (.xlsx / .xls) atau .csv' });
+    }
+
+    let rows;
+    try {
+      const wb = xlsx.read(req.file.buffer, { type: 'buffer' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      rows = xlsx.utils.sheet_to_json(ws, { header: 1, raw: true, defval: '' });
+    } catch (err) {
+      return res.status(400).json({ success: false, message: 'File Excel tidak bisa dibaca' });
+    }
+
+    const petaBarang = new Map();
+    db.prepare('SELECT id, sku, artikel, stok FROM barang').all().forEach(b => petaBarang.set(String(b.sku).trim().toLowerCase(), b));
+
+    const hasil = prosesTransaksiExcel(rows, tipe, {
+      cariBarang: kode => petaBarang.get(String(kode).trim().toLowerCase()),
+      daftarRincian: grup => daftarRincian(grup).map(r => r.nama),
+      normalisasiNama
+    });
+    if (!hasil.ok) {
+      return res.status(400).json({ success: false, message: hasil.pesan, errors: hasil.errors, total_error: hasil.totalError });
+    }
+
+    const kilat = tipe === 'pengiriman-kilat' ? 1 : 0;
+    const arah = k.arah;
+    const updStok = db.prepare('UPDATE barang SET stok = stok + ? WHERE id = ?');
+    const insTrx = db.prepare('INSERT INTO transaksi (barang_id, tipe, sub_tipe, jumlah, user_id, created_at, kilat) VALUES (?, ?, ?, ?, ?, ?, ?)');
+    let totalQty = 0;
+    try {
+      db.transaction(() => {
+        hasil.items.forEach(it => {
+          updStok.run(arah * it.qty, it.barang.id);
+          insTrx.run(it.barang.id, k.tipeDb, it.subTipe, it.qty, req.user.id, `${it.tanggal}T00:00:00.000Z`, kilat);
+          totalQty += it.qty;
+        });
+      })();
+    } catch (err) {
+      console.error('Gagal simpan upload transaksi:', err.message);
+      return res.status(500).json({ success: false, message: 'Gagal menyimpan data. Tidak ada data yang tersimpan.' });
+    }
+
+    catatLog(req.user.id, req.user.username, 'UPLOAD TRANSAKSI', `${k.label} - ${hasil.items.length} baris, ${totalQty} pcs (file: ${req.file.originalname})`);
+    res.json({
+      success: true,
+      message: `Berhasil menyimpan ${hasil.items.length} baris (${totalQty} pcs) ke ${k.label}.`,
+      jumlah_baris: hasil.items.length, total_qty: totalQty,
+      peringatan: hasil.peringatan, total_peringatan: hasil.totalPeringatan
+    });
+  });
+
 // ============ DASHBOARD REKAP ============
 app.get('/api/dashboard-rekap', authMiddleware, (req, res) => {
   const startDate = req.query.start || new Date().toISOString().split('T')[0];
@@ -234,7 +329,7 @@ app.get('/api/dashboard-rekap', authMiddleware, (req, res) => {
       stok_total: totalStokSaatIni,
       total_aset: totalNilaiAset,
       masuk: totals['masuk'],
-      keluar: totals['keluar'],              // sudah termasuk Pengiriman Kilat
+      keluar: totals['keluar'] + totals['reseller'],   // marketplace (sudah termasuk Pengiriman Kilat) + Reseller
       return_masuk: totals['return-masuk'],
       return_keluar: totals['return-keluar'],
       affiliate: totals['affiliate'],
@@ -257,7 +352,7 @@ app.get('/api/laporan-outlet', authMiddleware, adminMiddleware, (req, res) => {
       SUM(t.jumlah * b.hpp) as total_hpp
     FROM transaksi t
     JOIN barang b ON t.barang_id = b.id
-    WHERE t.tipe = 'keluar' 
+    WHERE t.tipe IN ('keluar', 'reseller') 
       AND DATE(t.created_at) BETWEEN ? AND ?
     GROUP BY t.sub_tipe
   `;
@@ -275,7 +370,7 @@ app.get('/api/laporan-compare', authMiddleware, adminMiddleware, (req, res) => {
   }
 
   const getQtyTotal = (start, end) => {
-    const query = `SELECT SUM(jumlah) as total FROM transaksi WHERE tipe = 'keluar' AND DATE(created_at) BETWEEN ? AND ?`;
+    const query = `SELECT SUM(jumlah) as total FROM transaksi WHERE tipe IN ('keluar', 'reseller') AND DATE(created_at) BETWEEN ? AND ?`;
     const result = db.prepare(query).get(start, end);
     return result.total || 0;
   };
@@ -300,7 +395,7 @@ app.get('/api/laporan-daily', authMiddleware, adminMiddleware, (req, res) => {
       DATE(created_at) as tanggal, 
       SUM(jumlah) as total_qty
     FROM transaksi
-    WHERE tipe = 'keluar' 
+    WHERE tipe IN ('keluar', 'reseller') 
       AND DATE(created_at) BETWEEN ? AND ?
     GROUP BY DATE(created_at)
   `;
@@ -323,7 +418,7 @@ app.get('/api/laporan-monthly', authMiddleware, adminMiddleware, (req, res) => {
       strftime('%Y-%m', created_at) as bulan, 
       SUM(jumlah) as total_qty
     FROM transaksi
-    WHERE tipe = 'keluar' 
+    WHERE tipe IN ('keluar', 'reseller') 
       AND DATE(created_at) BETWEEN ? AND ?
     GROUP BY strftime('%Y-%m', created_at)
   `;
@@ -348,7 +443,7 @@ app.get('/api/laporan-bestseller', authMiddleware, adminMiddleware, (req, res) =
       SUM(t.jumlah) as total_qty
     FROM transaksi t
     JOIN barang b ON t.barang_id = b.id
-    WHERE t.tipe = 'keluar' 
+    WHERE t.tipe IN ('keluar', 'reseller') 
       AND DATE(t.created_at) BETWEEN ? AND ?
     GROUP BY b.artikel, b.size
     ORDER BY total_qty DESC
