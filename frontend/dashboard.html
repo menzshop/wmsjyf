@@ -94,6 +94,7 @@
                         <div class="kpi tone-red">
                             <div class="kpi-top"><h3>TOTAL KELUAR</h3><span class="kpi-icon"><svg class="ico" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></span></div>
                             <div class="kpi-value" id="rekKeluar">0</div>
+                            <div class="kpi-note">TERMASUK RESELLER &amp; PENGIRIMAN KILAT</div>
                         </div>
                         <div class="kpi tone-amber">
                             <div class="kpi-top"><h3>RETURN MASUK</h3><span class="kpi-icon"><svg class="ico" viewBox="0 0 24 24"><polyline points="9 10 4 15 9 20"/><path d="M20 4v7a4 4 0 0 1-4 4H4"/></svg></span></div>
@@ -378,7 +379,9 @@
 
                 <!-- HALAMAN: SCAN BARANG MASUK -->
                 <div id="page-masuk" class="page-section">
-                    <div class="page-head"><div><h2>SCAN BARANG MASUK</h2></div></div>
+                    <div class="page-head"><div><h2>SCAN BARANG MASUK</h2></div>
+                        <button class="btn btn-secondary" onclick="openModalUploadTrx('masuk')"><svg class="ico" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg> UPLOAD EXCEL</button>
+                    </div>
                     <div class="scan-full-container">
                         <div class="scan-panel-left tone-blue">
                             <div class="scan-input-area">
@@ -404,7 +407,9 @@
                 </div>
                 <!-- HALAMAN: SCAN RETURN MASUK -->
                 <div id="page-return-masuk" class="page-section">
-                    <div class="page-head"><div><h2>SCAN RETURN MASUK</h2></div></div>
+                    <div class="page-head"><div><h2>SCAN RETURN MASUK</h2></div>
+                        <button class="btn btn-secondary" onclick="openModalUploadTrx('return-masuk')"><svg class="ico" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg> UPLOAD EXCEL</button>
+                    </div>
                     <div class="scan-full-container">
                         <div class="scan-panel-left tone-green">
                             <div class="scan-input-area">
@@ -430,7 +435,9 @@
                 </div>
                 <!-- HALAMAN: SCAN BARANG KELUAR -->
                 <div id="page-keluar" class="page-section">
-                    <div class="page-head"><div><h2>SCAN BARANG KELUAR</h2></div></div>
+                    <div class="page-head"><div><h2>SCAN BARANG KELUAR</h2></div>
+                        <button class="btn btn-secondary" onclick="openModalUploadTrx('keluar')"><svg class="ico" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg> UPLOAD EXCEL</button>
+                    </div>
                     <div class="scan-full-container">
                         <div class="scan-panel-left tone-red">
                             <div class="scan-input-area">
@@ -456,7 +463,9 @@
                 </div>
                 <!-- HALAMAN: SCAN RETURN KELUAR -->
                 <div id="page-return-keluar" class="page-section">
-                    <div class="page-head"><div><h2>SCAN RETURN KELUAR</h2></div></div>
+                    <div class="page-head"><div><h2>SCAN RETURN KELUAR</h2></div>
+                        <button class="btn btn-secondary" onclick="openModalUploadTrx('return-keluar')"><svg class="ico" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg> UPLOAD EXCEL</button>
+                    </div>
                     <div class="scan-full-container">
                         <div class="scan-panel-left tone-orange">
                             <div class="scan-input-area">
@@ -482,7 +491,9 @@
                 </div>
                 <!-- HALAMAN: SCAN AFFILIATE -->
                 <div id="page-affiliate" class="page-section">
-                    <div class="page-head"><div><h2>SCAN AFFILIATE</h2></div></div>
+                    <div class="page-head"><div><h2>SCAN AFFILIATE</h2></div>
+                        <button class="btn btn-secondary" onclick="openModalUploadTrx('affiliate')"><svg class="ico" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg> UPLOAD EXCEL</button>
+                    </div>
                     <div class="scan-full-container">
                         <div class="scan-panel-left tone-violet">
                             <div class="scan-input-area">
@@ -508,7 +519,9 @@
                 </div>
                 <!-- HALAMAN: SCAN PENGIRIMAN KILAT -->
                 <div id="page-pengiriman-kilat" class="page-section">
-                    <div class="page-head"><div><h2>SCAN PENGIRIMAN KILAT</h2></div></div>
+                    <div class="page-head"><div><h2>SCAN PENGIRIMAN KILAT</h2></div>
+                        <button class="btn btn-secondary" onclick="openModalUploadTrx('pengiriman-kilat')"><svg class="ico" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg> UPLOAD EXCEL</button>
+                    </div>
                     <div class="scan-full-container">
                         <div class="scan-panel-left tone-red">
                             <div class="scan-input-area">
@@ -531,7 +544,9 @@
                 </div>
                 <!-- HALAMAN: SCAN RESELLER -->
                 <div id="page-reseller" class="page-section">
-                    <div class="page-head"><div><h2>SCAN RESELLER</h2></div></div>
+                    <div class="page-head"><div><h2>SCAN RESELLER</h2></div>
+                        <button class="btn btn-secondary" onclick="openModalUploadTrx('reseller')"><svg class="ico" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg> UPLOAD EXCEL</button>
+                    </div>
                     <div class="scan-full-container">
                         <div class="scan-panel-left tone-teal">
                             <div class="scan-input-area">
@@ -630,6 +645,29 @@
         </div>
     </div>
 
+    <!-- Modal Upload Excel Transaksi -->
+    <div class="modal" id="modalUploadTrx">
+        <div class="modal-content">
+            <h3 id="uploadTrxJudul">UPLOAD EXCEL</h3>
+            <p class="modal-note">
+                KOLOM EXCEL (BARIS 1 = JUDUL): <b id="uploadTrxKolom"></b><br>
+                <span id="uploadTrxCatatan"></span>
+                <span class="warn">JIKA ADA 1 BARIS SALAH, SELURUH FILE DITOLAK DAN TIDAK ADA DATA YANG TERSIMPAN.</span>
+            </p>
+            <div class="toolbar" style="margin-top:0;">
+                <button class="btn btn-secondary btn-sm" type="button" onclick="unduhTemplateTrx()">UNDUH TEMPLATE EXCEL</button>
+            </div>
+            <div class="input-group">
+                <input type="file" id="fileUploadTrx" accept=".xlsx, .xls, .csv">
+            </div>
+            <div id="uploadTrxResult" class="result-box" style="display:none;"></div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="closeModalUploadTrx()">TUTUP</button>
+                <button class="btn btn-primary" id="btnUploadTrx" onclick="uploadTransaksi()">UPLOAD &amp; SIMPAN</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal Tambah Produk Manual -->
     <div class="modal" id="modalTambah">
         <div class="modal-content">
@@ -667,6 +705,6 @@
         </div>
     </div>
 
-    <script src="app.js"></script>
+    <script src="app.js?v=3"></script>
 </body>
 </html>

@@ -615,7 +615,7 @@ async function muatLaporanOutlet() {
     if (res && res.success) {
         const data = res.data;
         // Daftar marketplace mengikuti rincian terbaru, ditambah data lama yang rinciannya sudah dihapus
-        const listMarketplace = (rincianCache.keluar || []).map(r => r.nama);
+        const listMarketplace = [...(rincianCache.keluar || []), ...(rincianCache.reseller || [])].map(r => r.nama);
         data.forEach(d => { if (d.marketplace && !listMarketplace.includes(d.marketplace)) listMarketplace.push(d.marketplace); });
         
         let html = '';
@@ -890,6 +890,71 @@ async function uploadSo() {
     finally { btnUpload.disabled = false; btnUpload.textContent = 'MULAI SINKRONISASI STOK'; }
 }
 
+
+// UPLOAD EXCEL TRANSAKSI (SEMUA HALAMAN TRANSAKSI MASUK & KELUAR)
+const INFO_UPLOAD_TRX = {
+    'masuk':            { judul: 'UPLOAD EXCEL BARANG MASUK',  kolom: 'TANGGAL, BARCODE, ARTIKEL, QTY, VENDOR', catatan: 'VENDOR CUKUP NAMANYA SAJA, MISAL: OYOD (OTOMATIS MENJADI VENDOR OYOD).' },
+    'keluar':           { judul: 'UPLOAD EXCEL BARANG KELUAR', kolom: 'TANGGAL, BARCODE, ARTIKEL, QTY, MARKETPLACE', catatan: 'MARKETPLACE HARUS SUDAH TERDAFTAR, MISAL: SHOPEE, TIKTOK.' },
+    'pengiriman-kilat': { judul: 'UPLOAD EXCEL PENGIRIMAN KILAT', kolom: 'TANGGAL, BARCODE, ARTIKEL, QTY', catatan: 'OTOMATIS TERCATAT SEBAGAI BARANG KELUAR SHOPEE.' },
+    'return-masuk':     { judul: 'UPLOAD EXCEL RETURN MASUK',  kolom: 'TANGGAL, BARCODE, ARTIKEL, QTY, ASAL RETUR', catatan: 'ASAL RETUR HARUS SUDAH TERDAFTAR, MISAL: GAGAL COD.' },
+    'return-keluar':    { judul: 'UPLOAD EXCEL RETURN KELUAR', kolom: 'TANGGAL, BARCODE, ARTIKEL, QTY, ASAL RETUR', catatan: 'ASAL RETUR HARUS SUDAH TERDAFTAR, MISAL: PERBAIKAN VENDOR.' },
+    'affiliate':        { judul: 'UPLOAD EXCEL AFFILIATE',     kolom: 'TANGGAL, BARCODE, ARTIKEL, QTY', catatan: '' },
+    'reseller':         { judul: 'UPLOAD EXCEL RESELLER',      kolom: 'TANGGAL, BARCODE, ARTIKEL, QTY, KETERANGAN', catatan: 'KETERANGAN = NAMA RESELLER YANG SUDAH TERDAFTAR, MISAL: JYF STAR.' }
+};
+let tipeUploadTrx = null;
+
+function openModalUploadTrx(tipe) {
+    tipeUploadTrx = tipe;
+    const info = INFO_UPLOAD_TRX[tipe];
+    document.getElementById('uploadTrxJudul').textContent = info.judul;
+    document.getElementById('uploadTrxKolom').textContent = info.kolom;
+    document.getElementById('uploadTrxCatatan').textContent = info.catatan;
+    document.getElementById('fileUploadTrx').value = '';
+    document.getElementById('uploadTrxResult').style.display = 'none';
+    document.getElementById('modalUploadTrx').classList.add('active');
+}
+function closeModalUploadTrx() { document.getElementById('modalUploadTrx').classList.remove('active'); }
+
+async function unduhTemplateTrx() {
+    try {
+        const res = await fetch(`${API_URL}/template-transaksi/${tipeUploadTrx}`, { headers: { 'Authorization': `Bearer ${getToken()}` } });
+        if (!res.ok) throw new Error();
+        const url = window.URL.createObjectURL(await res.blob());
+        const a = document.createElement('a');
+        a.href = url; a.download = `Template_${tipeUploadTrx}.xlsx`;
+        document.body.appendChild(a); a.click(); a.remove();
+    } catch (err) { alert('GAGAL MENGUNDUH TEMPLATE'); }
+}
+
+async function uploadTransaksi() {
+    const file = document.getElementById('fileUploadTrx').files[0];
+    const box = document.getElementById('uploadTrxResult');
+    const btn = document.getElementById('btnUploadTrx');
+    if (!file) return alert('PILIH FILE EXCEL!');
+    const formData = new FormData(); formData.append('file', file);
+    btn.disabled = true; btn.textContent = 'MEMPROSES...'; box.style.display = 'none';
+    try {
+        const res = await fetch(`${API_URL}/upload-transaksi/${tipeUploadTrx}`, { method: 'POST', headers: { 'Authorization': `Bearer ${getToken()}` }, body: formData });
+        if (res.status === 401) { localStorage.clear(); window.location.href = 'index.html'; return; }
+        const data = await res.json();
+        const daftar = (judul, arr, total) => arr && arr.length
+            ? `<ul style="margin:8px 0 0 18px;line-height:1.6;">${arr.map(e => `<li>BARIS ${e.baris}: ${esc(e.pesan)}</li>`).join('')}</ul>` +
+              (total > arr.length ? `<div style="margin-top:6px;">...DAN ${total - arr.length} LAINNYA</div>` : '') : '';
+        box.style.display = 'block';
+        box.className = 'result-box ' + (data.success ? 'ok' : 'err');
+        box.innerHTML = `<strong>${data.success ? 'BERHASIL:' : 'GAGAL:'} ${esc(data.message || '')}</strong>`
+            + (data.success
+                ? (data.total_peringatan ? `<div style="margin-top:8px;">PERINGATAN (DATA TETAP TERSIMPAN):</div>${daftar('', data.peringatan, data.total_peringatan)}` : '')
+                : daftar('', data.errors, data.total_error));
+        if (data.success) {
+            document.getElementById('fileUploadTrx').value = '';
+            muatDashboard(); muatTabelBarang();
+        }
+    } catch (err) {
+        box.className = 'result-box err'; box.style.display = 'block'; box.textContent = 'GAGAL MENGUNGGAH.';
+    } finally { btn.disabled = false; btn.textContent = 'UPLOAD & SIMPAN'; }
+}
+
 // EXPORT EXCEL
 async function exportExcel() {
     try {
@@ -966,7 +1031,7 @@ async function muatTabelLog() {
         
         if (l.aksi === 'TRANSAKSI') { badgeClass = 'badge-log-trx'; }
         else if (l.aksi === 'HAPUS BARANG') { badgeClass = 'badge-log-del'; }
-        else if (l.aksi === 'IMPORT EXCEL' || l.aksi === 'UPLOAD SO') { badgeClass = 'badge-log-imp'; }
+        else if (l.aksi === 'IMPORT EXCEL' || l.aksi === 'UPLOAD SO' || l.aksi === 'UPLOAD TRANSAKSI') { badgeClass = 'badge-log-imp'; }
         else if (l.aksi === 'TAMBAH RINCIAN' || l.aksi === 'EDIT RINCIAN') { badgeClass = 'badge-log-imp'; }
         else if (l.aksi === 'HAPUS RINCIAN') { badgeClass = 'badge-log-del'; }
 

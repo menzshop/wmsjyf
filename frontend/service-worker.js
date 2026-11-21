@@ -1,4 +1,4 @@
-const CACHE_NAME = 'jyf-wms-v3';
+const CACHE_NAME = 'jyf-wms-v4';
 const urlsToCache = [
   '/',
   '/index.html',
