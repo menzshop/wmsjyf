@@ -429,4 +429,8 @@ app.post('/api/upload-so', authMiddleware, adminMiddleware, upload.single('file'
   res.json({ success: true, message: `Berhasil menyinkronkan ${successCount} data hasil SO.` });
 });
 
-app.listen(PORT, '0.0.0.0', () => console.log(`🚀 Server WMS berjalan di port ${PORT}`));
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+});
