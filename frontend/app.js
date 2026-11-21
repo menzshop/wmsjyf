@@ -1,4 +1,4 @@
-const API_URL = 'https://wmsjyf-production.up.railway.app/api';
+const API_URL = 'wmsjyf-production.up.railway.app/api';
 
 // LOGIN HANDLER
 const loginForm = document.getElementById('loginForm');
