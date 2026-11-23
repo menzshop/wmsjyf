@@ -4,6 +4,8 @@ const jwt = require('jsonwebtoken');
 const cors = require('cors');
 const multer = require('multer');
 const fs = require('fs');
+const os = require('os');
+const path = require('path');
 const xlsx = require('xlsx');
 const db = require('./database');
 const { KONFIG, kolomTemplate, prosesTransaksiExcel } = require('./transaksi-excel');
@@ -620,6 +622,25 @@ app.get('/api/export-excel', authMiddleware, (req, res) => {
   res.setHeader('Content-Disposition', 'attachment; filename="Laporan_Stok_JYF.xlsx"');
   res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
   res.send(buffer);
+});
+
+// ============ BACKUP DATABASE (ADMIN) ============
+// Salinan konsisten wms.db (aman dipakai walau ada transaksi berjalan), dikirim sebagai file unduhan.
+app.get('/api/backup-db', authMiddleware, adminMiddleware, async (req, res) => {
+  const tmp = path.join(os.tmpdir(), `wms-backup-${Date.now()}-${process.pid}.db`);
+  const hapusTmp = () => fs.unlink(tmp, () => {});
+  try {
+    await db.backup(tmp);
+    catatLog(req.user.id, req.user.username, 'BACKUP DATABASE', 'Mengunduh backup wms.db');
+    res.download(tmp, 'wms.db', err => {
+      hapusTmp();
+      if (err && !res.headersSent) res.status(500).json({ success: false, message: 'Gagal mengirim file backup' });
+    });
+  } catch (err) {
+    hapusTmp();
+    console.error('Gagal backup database:', err.message);
+    res.status(500).json({ success: false, message: 'Gagal membuat backup database' });
+  }
 });
 
 app.post('/api/import-csv', authMiddleware, adminMiddleware, upload.single('file'), (req, res) => {
