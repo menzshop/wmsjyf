@@ -209,6 +209,146 @@ app.post('/api/transaksi', authMiddleware, (req, res) => {
   res.json({ success: true, stok_baru: newStok });
 });
 
+// ============ RIWAYAT SCAN (LIHAT, UBAH, HAPUS) ============
+// Dipakai di semua halaman scan. Staff & admin sama-sama boleh mengoreksi; setiap koreksi tercatat di Log Aktivitas.
+// Kunci = nama halaman scan di menu; isinya = filter ke tabel transaksi.
+const HALAMAN_RIWAYAT = {
+  'masuk':            { tipe: 'masuk',         kilat: 0 },
+  'return-masuk':     { tipe: 'return-masuk',  kilat: 0 },
+  'keluar':           { tipe: 'keluar',        kilat: 0 },
+  'return-keluar':    { tipe: 'return-keluar', kilat: 0 },
+  'affiliate':        { tipe: 'affiliate',     kilat: 0 },
+  'pengiriman-kilat': { tipe: 'keluar',        kilat: 1 },
+  'reseller':         { tipe: 'reseller',      kilat: 0 }
+};
+const arahStok = tipe => (tipe === 'masuk' || tipe === 'return-masuk') ? 1 : -1;
+class GalatBisnis extends Error {}
+
+app.get('/api/riwayat-scan/:halaman', authMiddleware, (req, res) => {
+  const h = HALAMAN_RIWAYAT[req.params.halaman];
+  if (!h) return res.status(404).json({ success: false, message: 'Halaman tidak dikenal' });
+
+  const limit = Math.min(Math.max(parseInt(req.query.limit) || 50, 1), 200);
+  const offset = Math.max(parseInt(req.query.offset) || 0, 0);
+  const where = ['t.tipe = ?', 'COALESCE(t.kilat, 0) = ?'];
+  const param = [h.tipe, h.kilat];
+
+  const tgl = /^\d{4}-\d{2}-\d{2}$/;
+  if (tgl.test(req.query.start || '')) { where.push('DATE(t.created_at) >= ?'); param.push(req.query.start); }
+  if (tgl.test(req.query.end || ''))   { where.push('DATE(t.created_at) <= ?'); param.push(req.query.end); }
+
+  const q = String(req.query.q || '').trim().toLowerCase();
+  if (q) {
+    const like = '%' + q.replace(/[\\%_]/g, m => '\\' + m) + '%';
+    where.push(`(LOWER(b.sku) LIKE ? ESCAPE '\\' OR LOWER(b.artikel) LIKE ? ESCAPE '\\' OR LOWER(COALESCE(t.sub_tipe, '')) LIKE ? ESCAPE '\\' OR LOWER(COALESCE(u.username, '')) LIKE ? ESCAPE '\\')`);
+    param.push(like, like, like, like);
+  }
+
+  const dari = `FROM transaksi t JOIN barang b ON b.id = t.barang_id LEFT JOIN users u ON u.id = t.user_id WHERE ${where.join(' AND ')}`;
+  const total = db.prepare(`SELECT COUNT(*) AS n, COALESCE(SUM(t.jumlah), 0) AS qty ${dari}`).get(...param);
+  const data = db.prepare(`
+    SELECT t.id, t.tipe, t.sub_tipe, t.jumlah, COALESCE(t.kilat, 0) AS kilat, DATE(t.created_at) AS tanggal,
+           t.diubah_at, t.diubah_oleh, b.sku, b.artikel, b.size, u.username AS petugas
+    ${dari}
+    ORDER BY t.created_at DESC, t.id DESC LIMIT ? OFFSET ?
+  `).all(...param, limit, offset);
+
+  res.json({ success: true, data, total: total.n, total_qty: total.qty, limit, offset });
+});
+
+app.put('/api/transaksi/:id', authMiddleware, (req, res) => {
+  const trx = db.prepare('SELECT * FROM transaksi WHERE id = ?').get(req.params.id);
+  if (!trx) return res.status(404).json({ success: false, message: 'Data scan tidak ditemukan (mungkin sudah dihapus)' });
+
+  const qty = parseInt(req.body.jumlah);
+  if (!qty || qty < 1) return res.status(400).json({ success: false, message: 'Qty minimal 1' });
+
+  const skuBaru = String(req.body.sku || '').trim();
+  if (!skuBaru) return res.status(400).json({ success: false, message: 'SKU / barcode wajib diisi' });
+  const brgLama = db.prepare('SELECT * FROM barang WHERE id = ?').get(trx.barang_id);
+  const brgBaru = db.prepare('SELECT * FROM barang WHERE LOWER(sku) = LOWER(?)').get(skuBaru);
+  if (!brgBaru) return res.status(404).json({ success: false, message: `SKU "${skuBaru}" tidak terdaftar di data barang` });
+
+  // Tanggal: hanya diganti kalau memang berbeda, supaya jam aslinya tidak berubah
+  let waktuBaru = trx.created_at;
+  const tglBaru = String(req.body.tanggal || '').trim();
+  if (tglBaru) {
+    const cek = new Date(`${tglBaru}T00:00:00.000Z`);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(tglBaru) || isNaN(cek) || cek.toISOString().slice(0, 10) !== tglBaru) {
+      return res.status(400).json({ success: false, message: 'Format tanggal tidak valid' });
+    }
+    const tglLama = db.prepare('SELECT DATE(created_at) AS d FROM transaksi WHERE id = ?').get(trx.id).d;
+    if (tglBaru !== tglLama) waktuBaru = `${tglBaru}T00:00:00.000Z`;
+  }
+
+  // Keterangan (vendor / marketplace / alasan retur / reseller / affiliate)
+  let subBaru = trx.sub_tipe;
+  if (trx.kilat) subBaru = 'SHOPEE';
+  else if (req.body.sub_tipe !== undefined) {
+    const s = String(req.body.sub_tipe || '').replace(/\s+/g, ' ').trim();
+    if (s !== (trx.sub_tipe || '')) {
+      const daftar = daftarRincian(trx.tipe).map(r => r.nama);
+      if (daftar.length > 0 && !daftar.includes(s)) {
+        return res.status(400).json({ success: false, message: `Keterangan "${s}" tidak terdaftar. Muat ulang halaman.` });
+      }
+      subBaru = s || '-';
+    }
+  }
+
+  const arah = arahStok(trx.tipe);
+  const updStok = db.prepare('UPDATE barang SET stok = ? WHERE id = ?');
+  try {
+    db.transaction(() => {
+      if (brgLama.id === brgBaru.id) {
+        const stokAkhir = brgLama.stok + arah * (qty - trx.jumlah);
+        if (stokAkhir < 0) throw new GalatBisnis(`Stok ${brgLama.sku} tidak cukup untuk perubahan ini (stok sekarang ${brgLama.stok}).`);
+        updStok.run(stokAkhir, brgLama.id);
+      } else {
+        const stokLama = brgLama.stok - arah * trx.jumlah;   // batalkan efek scan lama
+        if (stokLama < 0) throw new GalatBisnis(`Stok ${brgLama.sku} tidak cukup untuk membatalkan scan lama (stok sekarang ${brgLama.stok}, scan lama ${trx.jumlah}).`);
+        const stokBaru = brgBaru.stok + arah * qty;          // terapkan ke SKU yang benar
+        if (stokBaru < 0) throw new GalatBisnis(`Stok ${brgBaru.sku} tidak cukup (stok sekarang ${brgBaru.stok}, diminta ${qty}).`);
+        updStok.run(stokLama, brgLama.id);
+        updStok.run(stokBaru, brgBaru.id);
+      }
+      db.prepare('UPDATE transaksi SET barang_id = ?, jumlah = ?, sub_tipe = ?, created_at = ?, diubah_at = ?, diubah_oleh = ? WHERE id = ?')
+        .run(brgBaru.id, qty, subBaru, waktuBaru, new Date().toISOString(), req.user.username, trx.id);
+    })();
+  } catch (err) {
+    if (err instanceof GalatBisnis) return res.status(400).json({ success: false, message: err.message });
+    console.error('Gagal ubah transaksi:', err.message);
+    return res.status(500).json({ success: false, message: 'Gagal menyimpan perubahan' });
+  }
+
+  catatLog(req.user.id, req.user.username, 'EDIT TRANSAKSI',
+    `${String(trx.tipe).toUpperCase()}${trx.kilat ? ' (KILAT)' : ''} #${trx.id}: ${brgLama.sku} x${trx.jumlah} [${trx.sub_tipe || '-'}] -> ${brgBaru.sku} x${qty} [${subBaru || '-'}]`);
+  res.json({ success: true, message: 'Perubahan tersimpan, stok sudah disesuaikan.' });
+});
+
+app.delete('/api/transaksi/:id', authMiddleware, (req, res) => {
+  const trx = db.prepare('SELECT * FROM transaksi WHERE id = ?').get(req.params.id);
+  if (!trx) return res.status(404).json({ success: false, message: 'Data scan tidak ditemukan (mungkin sudah dihapus)' });
+  const brg = db.prepare('SELECT * FROM barang WHERE id = ?').get(trx.barang_id);
+
+  try {
+    db.transaction(() => {
+      // Batalkan efek scan ke stok: scan masuk dikurangi lagi, scan keluar dikembalikan
+      const stokAkhir = brg.stok - arahStok(trx.tipe) * trx.jumlah;
+      if (stokAkhir < 0) throw new GalatBisnis(`Tidak bisa dihapus: stok ${brg.sku} sekarang ${brg.stok}, sedangkan scan ini menambah ${trx.jumlah} pcs (stok akan minus). Minta admin menyesuaikan stok lebih dulu.`);
+      db.prepare('UPDATE barang SET stok = ? WHERE id = ?').run(stokAkhir, brg.id);
+      db.prepare('DELETE FROM transaksi WHERE id = ?').run(trx.id);
+    })();
+  } catch (err) {
+    if (err instanceof GalatBisnis) return res.status(400).json({ success: false, message: err.message });
+    console.error('Gagal hapus transaksi:', err.message);
+    return res.status(500).json({ success: false, message: 'Gagal menghapus data scan' });
+  }
+
+  catatLog(req.user.id, req.user.username, 'HAPUS TRANSAKSI',
+    `${String(trx.tipe).toUpperCase()}${trx.kilat ? ' (KILAT)' : ''} #${trx.id}: ${brg.sku} x${trx.jumlah} [${trx.sub_tipe || '-'}] tgl ${String(trx.created_at).slice(0, 10)}`);
+  res.json({ success: true, message: 'Data scan dihapus, stok sudah disesuaikan.' });
+});
+
 // ============ HAPUS SEMUA DATA (MODE DEVELOPER, ADMIN) ============
 // Menghapus semua riwayat transaksi & mereset stok. Akun, rincian (vendor/marketplace/dll) dan log aktivitas tetap ada.
 app.post('/api/reset-data', authMiddleware, adminMiddleware, (req, res) => {

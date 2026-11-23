@@ -60,6 +60,13 @@ if (!db.prepare('PRAGMA table_info(transaksi)').all().some(c => c.name === 'kila
   db.exec('ALTER TABLE transaksi ADD COLUMN kilat INTEGER DEFAULT 0');
 }
 
+// Penanda transaksi yang pernah dikoreksi lewat Riwayat Scan (siapa & kapan)
+{
+  const kolomTrx = db.prepare('PRAGMA table_info(transaksi)').all().map(c => c.name);
+  if (!kolomTrx.includes('diubah_at')) db.exec('ALTER TABLE transaksi ADD COLUMN diubah_at DATETIME');
+  if (!kolomTrx.includes('diubah_oleh')) db.exec('ALTER TABLE transaksi ADD COLUMN diubah_oleh TEXT');
+}
+
 // Tabel Rincian (vendor, marketplace, alasan return, reseller, affiliate) - bisa diubah lewat MODE DEVELOPER
 db.exec(`
   CREATE TABLE IF NOT EXISTS rincian (
