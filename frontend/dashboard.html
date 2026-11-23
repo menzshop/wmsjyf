@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#1858c9">
     <title>DASHBOARD - WMS</title>
     <script src="theme.js"></script>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=5">
 </head>
 <body class="dashboard-body">
 
@@ -693,6 +693,28 @@
         </div>
     </div>
 
+    <!-- Modal Ubah Data Scan (Riwayat Scan) -->
+    <div class="modal" id="modalEditTrx">
+        <div class="modal-content">
+            <h3 id="editTrxJudul">UBAH DATA SCAN</h3>
+            <p class="modal-note" id="editTrxInfo"></p>
+            <div class="input-group"><label for="editTrxTanggal">TANGGAL TRANSAKSI</label><input type="date" id="editTrxTanggal"></div>
+            <div class="input-group">
+                <label for="editTrxSku">SKU / BARCODE</label>
+                <input type="text" id="editTrxSku" autocomplete="off" oninput="cekSkuEditRiwayat()">
+                <div class="edit-trx-artikel" id="editTrxArtikel"></div>
+            </div>
+            <div class="input-group"><label for="editTrxQty">QTY</label><input type="number" id="editTrxQty" min="1"></div>
+            <div class="input-group"><label for="editTrxKet" id="editTrxKetLabel">KETERANGAN</label><select id="editTrxKet"></select></div>
+            <p class="modal-note">MENGGANTI SKU / QTY AKAN OTOMATIS MENYESUAIKAN STOK. SETIAP PERUBAHAN TERCATAT DI LOG AKTIVITAS.</p>
+            <div id="editTrxHasil" class="result-box" style="display:none;"></div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="tutupEditRiwayat()">BATAL</button>
+                <button class="btn btn-primary" id="btnSimpanEditTrx" onclick="simpanEditRiwayat()">SIMPAN PERUBAHAN</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal Tambah Produk Manual -->
     <div class="modal" id="modalTambah">
         <div class="modal-content">
@@ -730,6 +752,6 @@
         </div>
     </div>
 
-    <script src="app.js?v=4"></script>
+    <script src="app.js?v=5"></script>
 </body>
 </html>

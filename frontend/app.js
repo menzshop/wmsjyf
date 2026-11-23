@@ -112,6 +112,8 @@ function showPage(pageId) {
     if (pageToIdMap[pageId]) document.getElementById(pageToIdMap[pageId]).focus();
 
     // 5. Muat data sesuai halaman yang dibuka
+    const tipeRiwayat = riwayatTipeDariHalaman(pageId);
+    if (tipeRiwayat) muatRiwayat(tipeRiwayat);
     if (pageId === 'page-kelola-akun') muatTabelUsers();
     if (pageId === 'page-log') muatTabelLog();
 
@@ -441,6 +443,7 @@ async function simpanKeranjang(tipe) {
         renderScanList(tipe);
         muatDashboard();
         muatTabelBarang();
+        muatRiwayat(tipe);
     } catch (err) {
         alert('GAGAL MENYIMPAN: ' + String(err.message).toUpperCase());
     }
@@ -1108,3 +1111,262 @@ function logout() {
         window.location.href = 'index.html';
     }
 }
+
+
+// ============================================================
+// RIWAYAT SCAN (LIHAT, CARI, UBAH, HAPUS) - SEMUA HALAMAN SCAN
+// ============================================================
+// Catatan: semua di bawah memakai function biasa / window.* (bukan let/const di level atas)
+// supaya aman dipanggil dari showPage() yang berjalan saat halaman pertama dimuat.
+function riwayatKonfig() {
+    return {
+        'masuk':            { page: 'page-masuk',            label: 'VENDOR',      grup: 'masuk' },
+        'return-masuk':     { page: 'page-return-masuk',     label: 'ASAL RETUR',  grup: 'return-masuk' },
+        'keluar':           { page: 'page-keluar',           label: 'MARKETPLACE', grup: 'keluar' },
+        'return-keluar':    { page: 'page-return-keluar',    label: 'ASAL RETUR',  grup: 'return-keluar' },
+        'affiliate':        { page: 'page-affiliate',        label: 'AFFILIATE',   grup: 'affiliate' },
+        'pengiriman-kilat': { page: 'page-pengiriman-kilat', label: 'MARKETPLACE', grup: null },
+        'reseller':         { page: 'page-reseller',         label: 'RESELLER',    grup: 'reseller' }
+    };
+}
+function riwayatTipeDariHalaman(pageId) {
+    const k = riwayatKonfig();
+    return Object.keys(k).find(t => k[t].page === pageId) || null;
+}
+function riwayatState(tipe) {
+    window.__riwayat = window.__riwayat || {};
+    if (!window.__riwayat[tipe]) window.__riwayat[tipe] = { rows: [], total: 0, totalQty: 0, offset: 0, limit: 50, timer: null, editId: null };
+    return window.__riwayat[tipe];
+}
+function tglLokal(d) {
+    const z = n => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}`;
+}
+function tglTampil(iso) {   // 2026-11-23 -> 23/11/2026
+    const m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+    return m ? `${m[3]}/${m[2]}/${m[1]}` : '-';
+}
+
+// Panel riwayat disisipkan lewat JS ke tiap halaman scan (tidak perlu menyalin HTML 7 kali)
+function buatPanelRiwayat() {
+    const k = riwayatKonfig();
+    const hariIni = new Date();
+    const awal = new Date(); awal.setDate(awal.getDate() - 6);
+    Object.keys(k).forEach(tipe => {
+        const halaman = document.getElementById(k[tipe].page);
+        if (!halaman || document.getElementById(`riwayat-${tipe}`)) return;
+        const wrap = document.createElement('div');
+        wrap.className = 'riwayat-card';
+        wrap.id = `riwayat-${tipe}`;
+        wrap.innerHTML = `
+            <div class="riwayat-head">
+                <div>
+                    <h3>RIWAYAT SCAN</h3>
+                    <p class="page-sub">DATA YANG SUDAH DISIMPAN. SALAH SCAN / SALAH STIKER? UBAH ATAU HAPUS DI SINI &mdash; STOK OTOMATIS MENYESUAIKAN.</p>
+                </div>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="muatRiwayat('${tipe}')">MUAT ULANG</button>
+            </div>
+            <div class="riwayat-filter">
+                <input type="text" id="riwayatCari-${tipe}" class="riwayat-cari" placeholder="CARI SKU, ARTIKEL, ${k[tipe].label}, ATAU NAMA PETUGAS..." autocomplete="off" oninput="cariRiwayat('${tipe}')">
+                <div class="riwayat-tgl">
+                    <input type="date" id="riwayatMulai-${tipe}" value="${tglLokal(awal)}" onchange="muatRiwayat('${tipe}')" aria-label="DARI TANGGAL">
+                    <span>S/D</span>
+                    <input type="date" id="riwayatAkhir-${tipe}" value="${tglLokal(hariIni)}" onchange="muatRiwayat('${tipe}')" aria-label="SAMPAI TANGGAL">
+                </div>
+            </div>
+            <div class="table-card scroll">
+                <table>
+                    <thead><tr>
+                        <th>TANGGAL</th><th>SKU / BARCODE</th><th>ARTIKEL</th><th class="ta-c">QTY</th><th>${k[tipe].label}</th><th>PETUGAS</th><th class="ta-c">AKSI</th>
+                    </tr></thead>
+                    <tbody id="riwayatBody-${tipe}"><tr><td colspan="7" class="row-note">MEMUAT DATA...</td></tr></tbody>
+                </table>
+            </div>
+            <div class="riwayat-foot">
+                <span class="muted-text" id="riwayatInfo-${tipe}"></span>
+                <div class="pagination">
+                    <button type="button" class="btn btn-secondary btn-sm" id="riwayatPrev-${tipe}" onclick="halamanRiwayat('${tipe}', -1)">&laquo; SEBELUMNYA</button>
+                    <button type="button" class="btn btn-secondary btn-sm" id="riwayatNext-${tipe}" onclick="halamanRiwayat('${tipe}', 1)">BERIKUTNYA &raquo;</button>
+                </div>
+            </div>`;
+        halaman.appendChild(wrap);
+    });
+}
+
+function cariRiwayat(tipe) {
+    const st = riwayatState(tipe);
+    clearTimeout(st.timer);
+    st.timer = setTimeout(() => { st.offset = 0; muatRiwayat(tipe, true); }, 350);
+}
+function halamanRiwayat(tipe, arah) {
+    const st = riwayatState(tipe);
+    st.offset = Math.max(0, st.offset + arah * st.limit);
+    muatRiwayat(tipe, true);
+}
+
+async function muatRiwayat(tipe, tetapDiHalaman) {
+    const st = riwayatState(tipe);
+    if (!document.getElementById(`riwayatBody-${tipe}`)) return;
+    if (!tetapDiHalaman) st.offset = 0;
+    const body = document.getElementById(`riwayatBody-${tipe}`);
+
+    const qs = new URLSearchParams({ limit: st.limit, offset: st.offset });
+    const cari = document.getElementById(`riwayatCari-${tipe}`).value.trim();
+    const mulai = document.getElementById(`riwayatMulai-${tipe}`).value;
+    const akhir = document.getElementById(`riwayatAkhir-${tipe}`).value;
+    if (cari) qs.set('q', cari);
+    if (mulai) qs.set('start', mulai);
+    if (akhir) qs.set('end', akhir);
+
+    const res = await apiFetch(`/riwayat-scan/${encodeURIComponent(tipe)}?${qs}`);
+    if (!res || !res.success) {
+        body.innerHTML = `<tr><td colspan="7" class="row-note is-error">GAGAL MEMUAT RIWAYAT${res && res.message ? ': ' + esc(String(res.message).toUpperCase()) : ''}</td></tr>`;
+        return;
+    }
+    st.rows = res.data; st.total = res.total; st.totalQty = res.total_qty;
+    renderRiwayat(tipe);
+}
+
+function renderRiwayat(tipe) {
+    const st = riwayatState(tipe);
+    const body = document.getElementById(`riwayatBody-${tipe}`);
+    if (!st.rows.length) {
+        body.innerHTML = '<tr><td colspan="7" class="row-note">TIDAK ADA RIWAYAT SCAN PADA FILTER INI</td></tr>';
+    } else {
+        body.innerHTML = st.rows.map(r => `
+            <tr>
+                <td class="num">${tglTampil(r.tanggal)}</td>
+                <td class="sku">${esc(r.sku)}</td>
+                <td>${esc(r.artikel)}${r.size && r.size !== '-' ? ` <span class="badge badge-size">${esc(r.size)}</span>` : ''}
+                    ${r.diubah_oleh ? `<div class="muted-text riwayat-diedit">DIKOREKSI OLEH ${esc(String(r.diubah_oleh).toUpperCase())}</div>` : ''}</td>
+                <td class="ta-c num"><strong>${r.jumlah}</strong></td>
+                <td>${esc(r.sub_tipe || '-')}</td>
+                <td>${esc(r.petugas || '-')}</td>
+                <td class="ta-c riwayat-aksi">
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="bukaEditRiwayat('${tipe}', ${r.id})">UBAH</button>
+                    <button type="button" class="btn btn-danger btn-sm" onclick="hapusRiwayat('${tipe}', ${r.id})">HAPUS</button>
+                </td>
+            </tr>`).join('');
+    }
+    const dari = st.total ? st.offset + 1 : 0;
+    const sampai = Math.min(st.offset + st.limit, st.total);
+    document.getElementById(`riwayatInfo-${tipe}`).textContent =
+        `MENAMPILKAN ${dari}-${sampai} DARI ${st.total} SCAN (TOTAL ${st.totalQty} PCS)`;
+    document.getElementById(`riwayatPrev-${tipe}`).disabled = st.offset <= 0;
+    document.getElementById(`riwayatNext-${tipe}`).disabled = st.offset + st.limit >= st.total;
+}
+
+// ---------- UBAH ----------
+function bukaEditRiwayat(tipe, id) {
+    const st = riwayatState(tipe);
+    const r = st.rows.find(x => x.id === id);
+    if (!r) return alert('DATA TIDAK DITEMUKAN. MUAT ULANG RIWAYAT.');
+    const k = riwayatKonfig()[tipe];
+    st.editId = id;
+    window.__editRiwayatTipe = tipe;
+
+    document.getElementById('editTrxJudul').textContent = 'UBAH DATA SCAN';
+    document.getElementById('editTrxInfo').textContent =
+        `${r.petugas ? 'DI-SCAN OLEH ' + String(r.petugas).toUpperCase() : 'PETUGAS TIDAK DIKETAHUI'} \u2022 ID #${r.id}`;
+    document.getElementById('editTrxTanggal').value = r.tanggal;
+    document.getElementById('editTrxSku').value = r.sku;
+    document.getElementById('editTrxQty').value = r.jumlah;
+    document.getElementById('editTrxKetLabel').textContent = k.label;
+    document.getElementById('editTrxArtikel').textContent = `${r.artikel}${r.size && r.size !== '-' ? ' (SIZE: ' + r.size + ')' : ''}`;
+    document.getElementById('editTrxArtikel').className = 'edit-trx-artikel';
+
+    const sel = document.getElementById('editTrxKet');
+    if (!k.grup) {   // pengiriman kilat selalu SHOPEE
+        sel.innerHTML = '<option value="SHOPEE">SHOPEE</option>';
+        sel.value = 'SHOPEE'; sel.disabled = true;
+    } else {
+        const daftar = (rincianCache[k.grup] || []).map(x => x.nama);
+        const sekarang = r.sub_tipe || '-';
+        if (!daftar.includes(sekarang)) daftar.unshift(sekarang);   // nilai lama tetap tampil walau sudah dihapus dari daftar
+        sel.innerHTML = daftar.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
+        sel.value = sekarang; sel.disabled = false;
+    }
+    document.getElementById('editTrxHasil').style.display = 'none';
+    document.getElementById('btnSimpanEditTrx').disabled = false;
+    document.getElementById('modalEditTrx').classList.add('active');
+}
+function tutupEditRiwayat() { document.getElementById('modalEditTrx').classList.remove('active'); }
+
+// Tampilkan artikel dari SKU yang diketik, supaya staff yakin SKU barunya benar
+function cekSkuEditRiwayat() {
+    clearTimeout(window.__skuEditTimer);
+    const box = document.getElementById('editTrxArtikel');
+    const sku = document.getElementById('editTrxSku').value.trim();
+    if (!sku) { box.textContent = 'ISI SKU / BARCODE'; box.className = 'edit-trx-artikel salah'; return; }
+    box.textContent = 'MENCARI...'; box.className = 'edit-trx-artikel';
+    window.__skuEditTimer = setTimeout(async () => {
+        const res = await apiFetch(`/barang/sku/${encodeURIComponent(sku)}`);
+        if (document.getElementById('editTrxSku').value.trim() !== sku) return;   // sudah berubah lagi
+        if (res && res.success) {
+            const b = res.data;
+            box.textContent = `${b.artikel}${b.size && b.size !== '-' ? ' (SIZE: ' + b.size + ')' : ''} \u2022 STOK ${b.stok}`;
+            box.className = 'edit-trx-artikel';
+        } else {
+            box.textContent = 'SKU TIDAK DITEMUKAN DI DATA BARANG';
+            box.className = 'edit-trx-artikel salah';
+        }
+    }, 300);
+}
+
+async function simpanEditRiwayat() {
+    const tipe = window.__editRiwayatTipe;
+    const st = riwayatState(tipe);
+    const hasil = document.getElementById('editTrxHasil');
+    const tombol = document.getElementById('btnSimpanEditTrx');
+    const body = {
+        tanggal: document.getElementById('editTrxTanggal').value,
+        sku: document.getElementById('editTrxSku').value.trim(),
+        jumlah: parseInt(document.getElementById('editTrxQty').value),
+        sub_tipe: document.getElementById('editTrxKet').value
+    };
+    if (!body.tanggal) return tampilHasilEdit('TANGGAL WAJIB DIISI', false);
+    if (!body.sku) return tampilHasilEdit('SKU / BARCODE WAJIB DIISI', false);
+    if (!body.jumlah || body.jumlah < 1) return tampilHasilEdit('QTY MINIMAL 1', false);
+
+    tombol.disabled = true;
+    try {
+        const res = await apiFetch(`/transaksi/${st.editId}`, { method: 'PUT', body: JSON.stringify(body) });
+        if (!res) return;
+        if (!res.success) { tombol.disabled = false; return tampilHasilEdit(String(res.message || 'GAGAL MENYIMPAN').toUpperCase(), false); }
+        tutupEditRiwayat();
+        await segarkanSetelahKoreksi(tipe);
+    } catch (err) {
+        tombol.disabled = false;
+        tampilHasilEdit('SERVER TIDAK TERHUBUNG', false);
+    }
+}
+function tampilHasilEdit(pesan, ok) {
+    const h = document.getElementById('editTrxHasil');
+    h.style.display = 'block'; h.className = 'result-box ' + (ok ? 'ok' : 'err'); h.textContent = pesan;
+}
+
+// ---------- HAPUS ----------
+async function hapusRiwayat(tipe, id) {
+    const st = riwayatState(tipe);
+    const r = st.rows.find(x => x.id === id);
+    if (!r) return alert('DATA TIDAK DITEMUKAN. MUAT ULANG RIWAYAT.');
+    const arahTxt = (tipe === 'masuk' || tipe === 'return-masuk') ? 'DIKURANGI' : 'DIKEMBALIKAN (DITAMBAH)';
+    if (!confirm(`HAPUS DATA SCAN INI?\n\n${r.sku}\n${r.artikel}\nQTY ${r.jumlah} \u2022 ${r.sub_tipe || '-'} \u2022 ${tglTampil(r.tanggal)}\n\nSTOK BARANG AKAN ${arahTxt} ${r.jumlah} PCS.`)) return;
+    try {
+        const res = await apiFetch(`/transaksi/${id}`, { method: 'DELETE' });
+        if (!res) return;
+        if (!res.success) return alert('GAGAL MENGHAPUS: ' + String(res.message || '').toUpperCase());
+        await segarkanSetelahKoreksi(tipe);
+    } catch (err) { alert('SERVER TIDAK TERHUBUNG'); }
+}
+
+async function segarkanSetelahKoreksi(tipe) {
+    await muatRiwayat(tipe, true);
+    // kalau halaman jadi kosong (menghapus data terakhir di halaman ini), mundur satu halaman
+    const st = riwayatState(tipe);
+    if (!st.rows.length && st.offset > 0) { st.offset = Math.max(0, st.offset - st.limit); await muatRiwayat(tipe, true); }
+    muatDashboard();
+    muatTabelBarang();
+}
+
+if (window.location.pathname.includes('dashboard.html') && getToken()) buatPanelRiwayat();

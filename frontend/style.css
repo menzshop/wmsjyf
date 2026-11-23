@@ -570,3 +570,30 @@ table.compare .cmp-value { font-family: var(--font-mono); font-size: 26px; font-
 .btn-mini.danger { color: var(--danger); border-color: var(--danger); }
 .btn-mini.add { margin-left: auto; color: #fff; background: var(--tone, var(--primary)); border-color: transparent; }
 .panel-empty { margin: 4px 0 0; font-size: 11px; font-weight: 600; letter-spacing: 0.08em; color: var(--muted); }
+
+
+/* ============ RIWAYAT SCAN ============ */
+.riwayat-card { width: 100%; max-width: 1100px; margin: 28px auto 0; padding: 22px; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; box-shadow: var(--shadow-sm); }
+.riwayat-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+.riwayat-head > div { flex: 1 1 260px; min-width: 0; }
+.riwayat-head .btn { flex: 0 0 auto; }
+.riwayat-head h3 { font-size: 14px; letter-spacing: 0.1em; margin-bottom: 4px; }
+.riwayat-filter { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+.riwayat-cari { flex: 1 1 280px; width: auto; min-width: 0; }
+.riwayat-tgl { display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; color: var(--muted); }
+.riwayat-tgl input[type="date"] { width: 150px; }
+.riwayat-card .table-card { box-shadow: none; }
+.riwayat-card td { vertical-align: middle; }
+.riwayat-diedit { margin-top: 3px; font-size: 10.5px; letter-spacing: 0.06em; color: var(--warning); }
+.riwayat-card td.sku { white-space: nowrap; }
+.riwayat-aksi { white-space: nowrap; }
+.riwayat-aksi .btn + .btn { margin-left: 6px; }
+.riwayat-foot { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+.edit-trx-artikel { margin-top: 7px; font-size: 12px; font-weight: 600; letter-spacing: 0.04em; color: var(--tone-green); }
+.edit-trx-artikel.salah { color: var(--danger); }
+:root[data-theme="dark"] .edit-trx-artikel.salah { color: #f2707b; }
+@media (max-width: 560px) {
+    .riwayat-card { padding: 16px; margin-top: 20px; }
+    .riwayat-tgl { width: 100%; }
+    .riwayat-tgl input[type="date"] { flex: 1 1 0; width: auto; min-width: 0; padding: 0 8px; font-size: 13px; }
+}
