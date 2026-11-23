@@ -1,6 +1,23 @@
 const Database = require('better-sqlite3');
 const bcrypt = require('bcryptjs');
-const db = new Database('wms.db');
+const fs = require('fs');
+const path = require('path');
+
+// Lokasi database. Di Railway isi variabel DB_PATH=/data/wms.db (folder Volume) supaya data TIDAK hilang saat deploy ulang.
+// Tanpa DB_PATH (misal dijalankan di komputer sendiri) tetap memakai wms.db di folder backend.
+const DB_PATH = process.env.DB_PATH || 'wms.db';
+if (process.env.DB_PATH) {
+  fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
+  // Pertama kali (Volume masih kosong): salin wms.db yang ada di repo sebagai data awal.
+  // Setelah itu file di Volume TIDAK pernah ditimpa lagi oleh deploy.
+  const dataAwal = path.join(__dirname, 'wms.db');
+  if (!fs.existsSync(DB_PATH) && fs.existsSync(dataAwal)) {
+    fs.copyFileSync(dataAwal, DB_PATH);
+    console.log('📦 Volume masih kosong: wms.db dari repo disalin sebagai data awal ->', DB_PATH);
+  }
+}
+const db = new Database(DB_PATH);
+console.log('🗄️  Database dipakai:', path.resolve(DB_PATH));
 
 // Tabel Users
 db.exec(`
