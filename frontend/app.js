@@ -999,6 +999,36 @@ async function exportExcel() {
     } catch (err) { alert('GAGAL MENGUNDUH LAPORAN EXCEL'); }
 }
 
+// UNDUH BACKUP DATABASE (ADMIN)
+async function unduhBackupDb() {
+    if (getUser().role !== 'admin') return;
+    const btn = document.getElementById('btnBackupDb');
+    const labelAsli = btn.innerHTML;
+    btn.disabled = true; btn.textContent = 'MEMBUAT BACKUP...';
+    try {
+        const res = await fetch(`${API_URL}/backup-db`, { headers: { 'Authorization': `Bearer ${getToken()}` } });
+        if (res.status === 401) { localStorage.clear(); window.location.href = 'index.html'; return; }
+        if (!res.ok) {
+            let pesan = 'GAGAL MEMBUAT BACKUP';
+            try { const j = await res.json(); if (j.message) pesan = String(j.message).toUpperCase(); } catch (e) {}
+            throw new Error(pesan);
+        }
+        const blob = await res.blob();
+        const z = n => String(n).padStart(2, '0');
+        const d = new Date();
+        const nama = `wms-backup-${d.getFullYear()}${z(d.getMonth() + 1)}${z(d.getDate())}-${z(d.getHours())}${z(d.getMinutes())}.db`;
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = nama;
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => window.URL.revokeObjectURL(url), 10000);
+    } catch (err) {
+        alert(err.message && err.message !== 'Failed to fetch' ? err.message : 'SERVER TIDAK TERHUBUNG');
+    } finally {
+        btn.disabled = false; btn.innerHTML = labelAsli;
+    }
+}
+
 // MANAJEMEN USER (ADMIN)
 async function muatTabelUsers() {
     const res = await apiFetch('/users');
@@ -1064,6 +1094,7 @@ async function muatTabelLog() {
         else if (l.aksi === 'IMPORT EXCEL' || l.aksi === 'UPLOAD SO' || l.aksi === 'UPLOAD TRANSAKSI') { badgeClass = 'badge-log-imp'; }
         else if (l.aksi === 'TAMBAH RINCIAN' || l.aksi === 'EDIT RINCIAN') { badgeClass = 'badge-log-imp'; }
         else if (l.aksi === 'HAPUS RINCIAN') { badgeClass = 'badge-log-del'; }
+        else if (l.aksi === 'BACKUP DATABASE') { badgeClass = 'badge-log-imp'; }
 
         return `
         <tr>
