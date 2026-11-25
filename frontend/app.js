@@ -1,4 +1,8 @@
-const API_URL = 'https://wmsjyf-production.up.railway.app/api';
+// Dibuka dari komputer sendiri (localhost) -> pakai backend lokal di port yang sama (mode tes).
+// Dibuka dari alamat lain (website asli) -> tetap memakai backend Railway.
+const API_URL = ['localhost', '127.0.0.1'].includes(location.hostname)
+  ? '/api'
+  : 'https://wmsjyf-production.up.railway.app/api';
 
 // LOGIN HANDLER
 const loginForm = document.getElementById('loginForm');
@@ -35,11 +39,20 @@ if (loginForm) {
 // HELPERS
 function getToken() { return localStorage.getItem('wms_token'); }
 function getUser() { return JSON.parse(localStorage.getItem('wms_user') || '{}'); }
+
+// HAK AKSES 4 ROLE (developer, admin, staff, demo). Penjaga sebenarnya ada di backend; ini hanya mengatur tampilan.
+function punyaAkses(fitur) {
+    const r = getUser().role;
+    if (fitur === 'developer') return r === 'developer';                                      // Mode Developer, Kelola Akun, Edit HPP massal
+    if (fitur === 'admin') return r === 'developer' || r === 'admin';                         // stok, HPP, tambah/hapus produk, upload SO, import, backup, Log Aktivitas
+    if (fitur === 'tulis') return r === 'developer' || r === 'admin' || r === 'staff';        // scan, upload transaksi, ubah/hapus riwayat scan
+    return false;
+}
+const ROLE_LABEL = { developer: 'DEVELOPER', admin: 'ADMIN', staff: 'STAFF', demo: 'DEMO' };
 async function apiFetch(endpoint, options = {}) {
-    const res = await fetch(`${API_URL}${endpoint}`, {
-        ...options,
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getToken()}`, ...(options.headers || {}) }
-    });
+    const headers = { 'Authorization': `Bearer ${getToken()}`, ...(options.headers || {}) };
+    if (!(options.body instanceof FormData) && !headers['Content-Type']) headers['Content-Type'] = 'application/json';
+    const res = await fetch(`${API_URL}${endpoint}`, { ...options, headers });
     if (res.status === 401) { localStorage.clear(); window.location.href = 'index.html'; return null; }
     return res.json();
 }
@@ -47,28 +60,59 @@ async function apiFetch(endpoint, options = {}) {
 // DASHBOARD INIT
 if (window.location.pathname.includes('dashboard.html')) {
     if (!getToken()) window.location.href = 'index.html';
-    else {
-        const user = getUser();
-        document.getElementById('userName').textContent = user.username || 'User';
-        
-        if (user.role !== 'admin') {
-            document.getElementById('adminButtons').style.display = 'none';
-        } else {
-            document.getElementById('menu-kelola-akun').style.display = 'block';
-            document.getElementById('menu-log-aktivitas').style.display = 'block';
-            document.getElementById('menu-developer').style.display = 'block';
-        }
+    else mulaiDashboard();
+}
 
-        const today = new Date().toISOString().split('T')[0];
-        if(document.getElementById('tglMulai')) {
-            document.getElementById('tglMulai').value = today;
-            document.getElementById('tglAkhir').value = today;
-        }
+async function mulaiDashboard() {
+    // Ambil role terbaru dari server: kalau developer mengubah role, tampilan ikut berubah tanpa login ulang.
+    try {
+        const me = await apiFetch('/me');
+        if (!me) return;   // token tidak valid -> sudah diarahkan ke halaman login
+        if (me.success && me.user) localStorage.setItem('wms_user', JSON.stringify(me.user));
+    } catch (err) { /* server tidak terjangkau: pakai data login terakhir */ }
 
-        terapkanDevMode();
-        muatRincian();
-        muatDashboard();
-        showPage('page-dashboard'); 
+    const user = getUser();
+    document.getElementById('userName').textContent = user.username || 'User';
+    terapkanRole();
+
+    const today = new Date().toISOString().split('T')[0];
+    if (document.getElementById('tglMulai')) {
+        document.getElementById('tglMulai').value = today;
+        document.getElementById('tglAkhir').value = today;
+    }
+
+    terapkanDevMode();
+    muatRincian();
+    muatDashboard();
+    showPage('page-dashboard');
+}
+
+// Atur menu & tombol sesuai role
+function terapkanRole() {
+    const user = getUser();
+    document.body.dataset.role = user.role || '';
+    const tampil = (id, ya) => { const el = document.getElementById(id); if (el) el.style.display = ya ? 'block' : 'none'; };
+
+    const tombolAdmin = document.getElementById('adminButtons');
+    if (tombolAdmin) tombolAdmin.style.display = punyaAkses('admin') ? '' : 'none';
+    tampil('menu-kelola-akun', punyaAkses('developer'));
+    tampil('menu-developer', punyaAkses('developer'));
+    tampil('menu-hpp-massal', punyaAkses('developer'));
+    tampil('menu-log-aktivitas', punyaAkses('admin'));
+
+    const badge = document.getElementById('userRoleBadge');
+    if (badge) { badge.textContent = ROLE_LABEL[user.role] || ''; badge.className = `badge role-badge badge-${user.role}`; }
+
+    // Akun DEMO: hanya melihat. Semua kotak scan & tombol simpan/upload dimatikan (server juga menolak semua perubahan).
+    const demo = user.role === 'demo';
+    const banner = document.getElementById('demoBanner');
+    if (banner) banner.style.display = demo ? 'block' : 'none';
+    if (demo) {
+        document.querySelectorAll('.scan-input-area input, .scan-input-area select, .btn-simpan-bottom button').forEach(el => {
+            el.disabled = true;
+            if (el.classList.contains('scan-input')) el.placeholder = 'AKUN DEMO: HANYA BISA MELIHAT';
+        });
+        document.querySelectorAll('button[onclick^="openModalUploadTrx"]').forEach(el => { el.style.display = 'none'; });
     }
 }
 
@@ -115,6 +159,7 @@ function showPage(pageId) {
     const tipeRiwayat = riwayatTipeDariHalaman(pageId);
     if (tipeRiwayat) muatRiwayat(tipeRiwayat);
     if (pageId === 'page-kelola-akun') muatTabelUsers();
+    if (pageId === 'page-hpp-massal') muatHppMassal();
     if (pageId === 'page-log') muatTabelLog();
 
     const today = new Date().toISOString().split('T')[0];
@@ -240,7 +285,7 @@ function renderTabelBarang() {
     if (dataDitampilkan.length === 0) {
         tbody.innerHTML = '<tr><td colspan="7" class="row-note">BARANG TIDAK DITEMUKAN</td></tr>';
     } else {
-        const isAdmin = getUser().role === 'admin';
+        const isAdmin = punyaAkses('admin');
         
         tbody.innerHTML = dataDitampilkan.map(b => {
             const hppFormat = (b.hpp || 0).toLocaleString('id-ID');
@@ -316,6 +361,129 @@ function formatInputRupiah(input) {
     } else {
         input.value = '';
     }
+}
+
+// EDIT HPP MASSAL (DEVELOPER)
+let semuaHppMassal = [];
+let filteredHppMassal = [];
+let perubahanHppMassal = new Map();
+let halamanHppMassal = 1;
+const limitHppMassal = 50;
+
+async function muatHppMassal() {
+    if (!punyaAkses('developer')) return;
+    const res = await apiFetch('/barang');
+    if (!res || !res.success) return;
+    semuaHppMassal = (res.data || []).map(b => ({ id: b.id, sku: String(b.sku || ''), artikel: String(b.artikel || ''), hpp: Number(b.hpp) || 0 }));
+    perubahanHppMassal.clear();
+    halamanHppMassal = 1;
+    filterHppMassal();
+    setStatusHppMassal(`${semuaHppMassal.length.toLocaleString('id-ID')} SKU dimuat.`);
+}
+
+function setStatusHppMassal(text) {
+    const el = document.getElementById('statusHppMassal');
+    if (el) el.textContent = text || '';
+}
+
+function filterHppMassal() {
+    const q = String(document.getElementById('searchHppMassal')?.value || '').toLowerCase().trim();
+    const filter = document.getElementById('filterHppMassal')?.value || 'semua';
+    filteredHppMassal = semuaHppMassal.filter(b => {
+        const cocokCari = !q || b.sku.toLowerCase().includes(q) || b.artikel.toLowerCase().includes(q);
+        const hppSekarang = perubahanHppMassal.has(b.sku.toLowerCase()) ? perubahanHppMassal.get(b.sku.toLowerCase()) : b.hpp;
+        const cocokFilter = filter === 'semua' || (filter === 'nol' && hppSekarang === 0) || (filter === 'berisi' && hppSekarang > 0);
+        return cocokCari && cocokFilter;
+    });
+    halamanHppMassal = 1;
+    renderHppMassal();
+}
+
+function ubahInputHppMassal(input, sku) {
+    const angka = parseInt(String(input.value).replace(/[^0-9]/g, ''), 10) || 0;
+    input.value = angka.toLocaleString('id-ID');
+    const key = String(sku).toLowerCase();
+    const original = semuaHppMassal.find(b => b.sku.toLowerCase() === key);
+    if (!original) return;
+    if (angka === original.hpp) perubahanHppMassal.delete(key);
+    else perubahanHppMassal.set(key, angka);
+    input.classList.toggle('changed', angka !== original.hpp);
+    const btn = document.getElementById('btnSimpanHppMassal');
+    if (btn) btn.disabled = perubahanHppMassal.size === 0;
+    setStatusHppMassal(`${perubahanHppMassal.size.toLocaleString('id-ID')} perubahan belum disimpan.`);
+}
+
+function renderHppMassal() {
+    const tbody = document.getElementById('tabelHppMassal');
+    if (!tbody) return;
+    const total = filteredHppMassal.length;
+    const totalHalaman = Math.ceil(total / limitHppMassal) || 1;
+    if (halamanHppMassal > totalHalaman) halamanHppMassal = totalHalaman;
+    const start = (halamanHppMassal - 1) * limitHppMassal;
+    const rows = filteredHppMassal.slice(start, start + limitHppMassal);
+    if (!rows.length) {
+        tbody.innerHTML = '<tr><td colspan="3" class="row-note">DATA TIDAK DITEMUKAN</td></tr>';
+    } else {
+        tbody.innerHTML = rows.map(b => {
+            const key = b.sku.toLowerCase();
+            const hpp = perubahanHppMassal.has(key) ? perubahanHppMassal.get(key) : b.hpp;
+            const changed = perubahanHppMassal.has(key);
+            return `<tr><td class="sku"><strong>${esc(b.sku)}</strong></td><td>${esc(b.artikel)}</td><td><div class="hpp-edit"><span>Rp</span><input type="text" value="${hpp.toLocaleString('id-ID')}" class="${changed ? 'changed' : ''}" oninput="ubahInputHppMassal(this, ${JSON.stringify(b.sku)})"></div></td></tr>`;
+        }).join('');
+    }
+    const pag = document.getElementById('paginationHppMassal');
+    if (!pag) return;
+    let html = `<button class="btn btn-secondary btn-sm" onclick="pindahHalamanHppMassal(${halamanHppMassal - 1})" ${halamanHppMassal === 1 ? 'disabled' : ''}>&laquo; PREV</button>`;
+    let sp = Math.max(1, halamanHppMassal - 2), ep = Math.min(totalHalaman, sp + 4);
+    if (ep - sp < 4) sp = Math.max(1, ep - 4);
+    for (let i = sp; i <= ep; i++) html += `<button class="btn ${i === halamanHppMassal ? 'btn-primary' : 'btn-secondary'} btn-sm" onclick="pindahHalamanHppMassal(${i})">${i}</button>`;
+    html += `<button class="btn btn-secondary btn-sm" onclick="pindahHalamanHppMassal(${halamanHppMassal + 1})" ${halamanHppMassal === totalHalaman ? 'disabled' : ''}>NEXT &raquo;</button>`;
+    pag.innerHTML = html;
+}
+
+function pindahHalamanHppMassal(page) { halamanHppMassal = page; renderHppMassal(); }
+
+async function simpanHppMassal() {
+    if (!perubahanHppMassal.size) return;
+    const items = Array.from(perubahanHppMassal.entries()).map(([sku, hpp]) => ({ sku, hpp }));
+    if (!confirm(`SIMPAN ${items.length} PERUBAHAN HPP?\n\nSTOK TIDAK AKAN DIUBAH.`)) return;
+    const btn = document.getElementById('btnSimpanHppMassal');
+    if (btn) { btn.disabled = true; btn.textContent = 'MENYIMPAN...'; }
+    const res = await apiFetch('/barang-hpp-massal', { method: 'PUT', body: JSON.stringify({ items }) });
+    if (res && res.success) {
+        const notFound = res.notFound?.length ? ` SKU tidak ditemukan: ${res.notFound.slice(0, 10).join(', ')}${res.notFound.length > 10 ? '...' : ''}` : '';
+        alert(`BERHASIL. ${res.updated} SKU diperbarui.${notFound}`);
+        await muatHppMassal();
+    } else {
+        alert('GAGAL MENYIMPAN HPP: ' + String(res?.message || 'KESALAHAN SERVER').toUpperCase());
+        if (btn) { btn.disabled = perubahanHppMassal.size === 0; btn.textContent = 'SIMPAN PERUBAHAN HPP'; }
+    }
+}
+
+async function unduhTemplateHpp() {
+    try {
+        const res = await fetch(`${API_URL}/barang-hpp-massal/template`, { headers: { 'Authorization': `Bearer ${getToken()}` } });
+        if (!res.ok) throw new Error('Gagal mengunduh template');
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a'); a.href = url; a.download = 'template_hpp_massal.xlsx'; a.click(); URL.revokeObjectURL(url);
+    } catch (e) { alert('GAGAL MENGUNDUH TEMPLATE EXCEL.'); }
+}
+
+async function uploadHppMassal(file) {
+    if (!file) return;
+    if (!/\.(xlsx|xls)$/i.test(file.name)) return alert('FILE HARUS .XLSX ATAU .XLS');
+    if (!confirm(`UPLOAD FILE "${file.name}"?\n\nHanya HPP yang akan diubah. STOK TIDAK AKAN DIUBAH.`)) return;
+    const form = new FormData(); form.append('file', file);
+    setStatusHppMassal('MEMPROSES EXCEL...');
+    const res = await apiFetch('/barang-hpp-massal/excel', { method: 'POST', body: form });
+    const input = document.getElementById('fileHppMassal'); if (input) input.value = '';
+    if (res && res.success) {
+        let msg = `UPLOAD BERHASIL. ${res.updated} SKU diperbarui.`;
+        if (res.notFound?.length) msg += `\nSKU tidak ditemukan: ${res.notFound.slice(0, 10).join(', ')}${res.notFound.length > 10 ? '...' : ''}`;
+        if (res.invalidRows?.length) msg += `\nBaris tidak valid: ${res.invalidRows.slice(0, 10).join(', ')}${res.invalidRows.length > 10 ? '...' : ''}`;
+        alert(msg); await muatHppMassal();
+    } else { setStatusHppMassal('UPLOAD GAGAL.'); alert('GAGAL UPLOAD HPP: ' + String(res?.message || 'KESALAHAN SERVER').toUpperCase()); }
 }
 
 // LOGIKA SCAN
@@ -481,8 +649,8 @@ function isiSelectRincian() {
     if (fieldAff) fieldAff.style.display = (rincianCache.affiliate || []).length ? '' : 'none';
 }
 
-// MODE DEVELOPER (HANYA ADMIN)
-function isDevMode() { return getUser().role === 'admin' && localStorage.getItem('wms_devmode') === '1'; }
+// MODE DEVELOPER (HANYA ROLE DEVELOPER)
+function isDevMode() { return punyaAkses('developer') && localStorage.getItem('wms_devmode') === '1'; }
 
 function toggleDevMode() {
     localStorage.setItem('wms_devmode', isDevMode() ? '0' : '1');
@@ -496,7 +664,10 @@ function terapkanDevMode() {
     const bn = document.getElementById('devBanner');
     if (st) { st.textContent = on ? 'ON' : 'OFF'; st.classList.toggle('on', on); }
     if (bn) bn.style.display = on ? 'block' : 'none';
+    const hppMenu = document.getElementById('menu-hpp-massal');
+    if (hppMenu) hppMenu.style.display = on ? 'block' : 'none';
 }
+
 
 async function refreshSetelahUbahRincian() {
     await muatRincian();
@@ -999,9 +1170,9 @@ async function exportExcel() {
     } catch (err) { alert('GAGAL MENGUNDUH LAPORAN EXCEL'); }
 }
 
-// UNDUH BACKUP DATABASE (ADMIN)
+// UNDUH BACKUP DATABASE (DEVELOPER & ADMIN)
 async function unduhBackupDb() {
-    if (getUser().role !== 'admin') return;
+    if (!punyaAkses('admin')) return;
     const btn = document.getElementById('btnBackupDb');
     const labelAsli = btn.innerHTML;
     btn.disabled = true; btn.textContent = 'MEMBUAT BACKUP...';
@@ -1029,27 +1200,63 @@ async function unduhBackupDb() {
     }
 }
 
-// MANAJEMEN USER (ADMIN)
+// MANAJEMEN USER (HANYA DEVELOPER)
 async function muatTabelUsers() {
     const res = await apiFetch('/users');
     const tbody = document.getElementById('tabelUsers');
-    if (!res || !res.data) return;
+    if (!res || !res.data) {
+        if (tbody) tbody.innerHTML = `<tr><td colspan="4" class="row-note is-error">GAGAL MEMUAT AKUN${res && res.message ? ': ' + esc(String(res.message).toUpperCase()) : ''}</td></tr>`;
+        return;
+    }
 
+    const saya = getUser().username;
+    window.__daftarUser = res.data;   // aksi di bawah mencari akun lewat id (username tidak disisipkan ke atribut JS)
     tbody.innerHTML = res.data.map(u => {
-        const roleClass = u.role === 'admin' ? 'badge-admin' : 'badge-staff';
-        const roleText = u.role === 'admin' ? 'ADMIN' : 'STAFF';
+        const nama = esc(u.username);
+        const badge = `<span class="badge badge-${esc(u.role)}">${esc(ROLE_LABEL[u.role] || String(u.role).toUpperCase())}</span>`;
+        const aksi = u.username === saya
+            ? '<span class="no-access">(AKUN ANDA)</span>'
+            : `<div class="akun-aksi">
+                    <select aria-label="UBAH ROLE ${nama}" onchange="ubahRoleUser(${u.id}, this)">
+                        ${Object.keys(ROLE_LABEL).map(r => `<option value="${r}" ${r === u.role ? 'selected' : ''}>${ROLE_LABEL[r]}</option>`).join('')}
+                    </select>
+                    <button class="btn btn-secondary btn-sm" onclick="resetPasswordUser(${u.id})">RESET PASSWORD</button>
+                    <button class="btn btn-danger btn-sm" onclick="hapusUser(${u.id})">HAPUS</button>
+               </div>`;
         return `
         <tr>
             <td class="num"><strong>#${u.id}</strong></td>
-            <td>${u.username}</td>
-            <td><span class="badge ${roleClass}">${roleText}</span></td>
-            <td>
-                ${u.username === getUser().username 
-                    ? '<span class="no-access">(AKUN ANDA)</span>' 
-                    : `<button class="btn btn-danger btn-sm" onclick="hapusUser(${u.id}, '${u.username}')">HAPUS</button>`}
-            </td>
-        </tr>
-    `}).join('');
+            <td>${nama}</td>
+            <td>${badge}</td>
+            <td>${aksi}</td>
+        </tr>`;
+    }).join('');
+}
+
+function cariUser(id) { return (window.__daftarUser || []).find(u => u.id === id); }
+
+async function ubahRoleUser(id, selectEl) {
+    const u = cariUser(id);
+    if (!u) return;
+    const roleBaru = selectEl.value;
+    if (roleBaru === u.role) return;
+    if (!confirm(`UBAH ROLE "${u.username}" DARI ${ROLE_LABEL[u.role] || u.role} MENJADI ${ROLE_LABEL[roleBaru]}?\n\nPERUBAHAN LANGSUNG BERLAKU. TAMPILAN BARU MUNCUL SETELAH AKUN TERSEBUT MEMUAT ULANG HALAMAN.`)) {
+        selectEl.value = u.role; return;
+    }
+    const res = await apiFetch(`/users/${id}`, { method: 'PUT', body: JSON.stringify({ role: roleBaru }) });
+    if (!(res && res.success)) alert('GAGAL: ' + String(res?.message || 'TERJADI KESALAHAN').toUpperCase());
+    muatTabelUsers();
+}
+
+async function resetPasswordUser(id) {
+    const u = cariUser(id);
+    if (!u) return;
+    const pw = prompt(`PASSWORD BARU UNTUK "${u.username}" (MINIMAL 6 KARAKTER):`);
+    if (pw === null) return;
+    if (pw.length < 6) return alert('PASSWORD MINIMAL 6 KARAKTER!');
+    const res = await apiFetch(`/users/${id}`, { method: 'PUT', body: JSON.stringify({ password: pw }) });
+    if (res && res.success) alert(`PASSWORD "${u.username}" BERHASIL DIGANTI. BERITAHU PEMILIK AKUN.`);
+    else alert('GAGAL: ' + String(res?.message || 'TERJADI KESALAHAN').toUpperCase());
 }
 
 async function simpanUser() {
@@ -1070,11 +1277,13 @@ async function simpanUser() {
     }
 }
 
-async function hapusUser(id, username) {
-    if (!confirm(`YAKIN INGIN MENGHAPUS AKUN "${username}"?`)) return;
+async function hapusUser(id) {
+    const u = cariUser(id);
+    if (!u) return;
+    if (!confirm(`YAKIN INGIN MENGHAPUS AKUN "${u.username}"?`)) return;
     const res = await apiFetch(`/users/${id}`, { method: 'DELETE' });
-    if (res && res.success) { muatTabelUsers(); } 
-    else { alert('GAGAL MENGHAPUS AKUN'); }
+    if (res && res.success) { muatTabelUsers(); }
+    else { alert('GAGAL: ' + String(res?.message || 'GAGAL MENGHAPUS AKUN').toUpperCase()); }
 }
 
 // MANAJEMEN LOG AKTIVITAS
@@ -1208,7 +1417,7 @@ function buatPanelRiwayat() {
             <div class="table-card scroll">
                 <table>
                     <thead><tr>
-                        <th>TANGGAL</th><th>SKU / BARCODE</th><th>ARTIKEL</th><th class="ta-c">QTY</th><th>${k[tipe].label}</th><th>PETUGAS</th><th class="ta-c">AKSI</th>
+                        <th>TANGGAL</th><th>SKU / BARCODE</th><th>ARTIKEL</th><th class="ta-c">QTY</th><th>${k[tipe].label}</th><th>PETUGAS</th><th class="ta-c th-riwayat-aksi">AKSI</th>
                     </tr></thead>
                     <tbody id="riwayatBody-${tipe}"><tr><td colspan="7" class="row-note">MEMUAT DATA...</td></tr></tbody>
                 </table>
