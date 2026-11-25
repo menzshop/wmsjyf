@@ -1,5 +1,4 @@
 const Database = require('better-sqlite3');
-const bcrypt = require('bcryptjs');
 const fs = require('fs');
 const path = require('path');
 
@@ -130,16 +129,35 @@ if (!sudahMigrasi('hapus_user_zahra_v1')) {
   })();
 }
 
-// Seed User Bawaan
-const users = ['firman', 'ikbal', 'tedi', 'siti'];
-const defaultPassword = 'jyfteam';
-const insertUser = db.prepare('INSERT OR IGNORE INTO users (username, password, role) VALUES (?, ?, ?)');
+// Akun awal dengan 4 role: developer, admin, staff, demo.
+// Password disimpan sebagai HASH bcrypt (bukan teks asli), supaya password asli tidak ikut terlihat di GitHub.
+// Migrasi ini jalan SEKALI: setelah itu password/role yang diubah lewat Kelola Akun tidak ditimpa lagi.
+const HASH_DEVELOPER = '$2b$10$kNuJf772vItTyFO0thDp7uzduKwKGJz6hzNymv5neT7jCgGDxN1Cm';
+const HASH_ADMIN     = '$2b$10$IUJlFeI6hiw5aZlyk8xxGuM4a9WDyoikAMbuhrecY2rA6N00tIyQO';
+const HASH_STAFF     = '$2b$10$c0k6OawQchFLI9Zjh3QAd.0XZE8Gq/vpMXj6O0DDbYqvXvKFtddky';
+const HASH_DEMO      = '$2b$10$Vzj5/2QSy6oFOyxdZfGmZe2pRm5MEfmKiePZKjGH6NQ9MEaaGnzXG';
+const AKUN_4_ROLE = [
+  ['firman', 'developer', HASH_DEVELOPER],
+  ['oke',    'admin',     HASH_ADMIN],
+  ['febry',  'admin',     HASH_ADMIN],
+  ['ikbal',  'staff',     HASH_STAFF],
+  ['siti',   'staff',     HASH_STAFF],
+  ['tedi',   'staff',     HASH_STAFF],
+  ['demo',   'demo',      HASH_DEMO]
+];
+if (!sudahMigrasi('akun_4_role_v1')) {
+  db.transaction(() => {
+    const ada = db.prepare('SELECT id FROM users WHERE username = ?');
+    const ubah = db.prepare('UPDATE users SET role = ?, password = ? WHERE username = ?');
+    const baru = db.prepare('INSERT INTO users (username, password, role) VALUES (?, ?, ?)');
+    AKUN_4_ROLE.forEach(([username, role, hash]) => {
+      if (ada.get(username)) ubah.run(role, hash, username);
+      else baru.run(username, hash, role);
+    });
+    tandaiMigrasi('akun_4_role_v1');
+  })();
+  console.log('🔐 Migrasi akun 4 role DIJALANKAN: firman=developer, oke/febry=admin, ikbal/siti/tedi=staff, demo=demo');
+}
 
-users.forEach(u => {
-  const hash = bcrypt.hashSync(defaultPassword, 10);
-  const role = u === 'firman' ? 'admin' : 'staff';
-  insertUser.run(u, hash, role);
-});
-
-console.log('✅ Database siap & user default dibuat');
+console.log('✅ Database siap (VERSI 4 ROLE)');
 module.exports = db;
