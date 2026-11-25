@@ -39,6 +39,9 @@
                 <li id="menu-developer" style="display: none;">
                     <a onclick="toggleDevMode()" id="menu-devmode"><svg class="ico" viewBox="0 0 24 24"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg> MODE DEVELOPER <span class="dev-state" id="devModeState">OFF</span></a>
                 </li>
+                <li id="menu-hpp-massal" style="display: none;">
+                    <a onclick="showPage('page-hpp-massal')" id="menu-hpp"><svg class="ico" viewBox="0 0 24 24"><line x1="12" y1="2" x2="12" y2="22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg> EDIT SEMUA HPP</a>
+                </li>
             </ul>
         </div>
         <div class="sidebar-overlay" onclick="closeSidebar()"></div>
@@ -57,12 +60,14 @@
                     </div>
                     <div class="user-info">
                         <span class="user-chip"><svg class="ico" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg><span id="userName">-</span></span>
+                        <span class="badge role-badge" id="userRoleBadge"></span>
                         <button class="btn-logout" onclick="logout()">LOGOUT</button>
                     </div>
                 </div>
             </div>
 
             <div class="content-area">
+                <div class="demo-banner" id="demoBanner" style="display:none;">AKUN DEMO &mdash; HANYA BISA MELIHAT TAMPILAN. SCAN, SIMPAN, UPLOAD, UBAH, DAN HAPUS DINONAKTIFKAN.</div>
 
                 <!-- HALAMAN 1: DASHBOARD UTAMA -->
                 <div id="page-dashboard" class="page-section active">
@@ -572,10 +577,46 @@
                     </div>
                 </div>
 
-                <!-- HALAMAN: KELOLA AKUN (ADMIN) -->
+                <!-- HALAMAN: EDIT SEMUA HPP (DEVELOPER) -->
+                <div id="page-hpp-massal" class="page-section">
+                    <div class="page-head">
+                        <div><h2>EDIT SEMUA HPP</h2><p class="page-sub">UBAH HPP MASSAL TANPA MENGUBAH STOK. KHUSUS DEVELOPER.</p></div>
+                    </div>
+                    <div class="dev-banner" style="display:block; margin-bottom:16px;">
+                        <b>PERHATIAN:</b> FITUR INI HANYA MENGUBAH HPP. STOK, ARTIKEL, SKU, DAN DATA TRANSAKSI TIDAK DIUBAH.
+                    </div>
+                    <div class="toolbar">
+                        <button class="btn btn-primary" onclick="simpanHppMassal()" id="btnSimpanHppMassal" disabled>SIMPAN PERUBAHAN HPP</button>
+                        <button class="btn btn-secondary" onclick="unduhTemplateHpp()">UNDUH TEMPLATE EXCEL</button>
+                        <label class="btn btn-success" style="cursor:pointer; margin:0;">UPLOAD EXCEL HPP<input type="file" id="fileHppMassal" accept=".xlsx,.xls" onchange="uploadHppMassal(this.files[0])" style="display:none;"></label>
+                    </div>
+                    <div class="search-container" style="margin-top:14px;">
+                        <svg class="ico" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                        <input type="text" id="searchHppMassal" placeholder="CARI SKU ATAU ARTIKEL..." oninput="filterHppMassal()">
+                    </div>
+                    <div class="filter-bar">
+                        <label>FILTER HPP</label>
+                        <select id="filterHppMassal" onchange="filterHppMassal()">
+                            <option value="semua">SEMUA HPP</option>
+                            <option value="nol">HPP = 0</option>
+                            <option value="berisi">HPP &gt; 0</option>
+                        </select>
+                        <button class="btn btn-secondary" onclick="muatHppMassal()">MUAT ULANG</button>
+                        <span id="statusHppMassal" class="modal-note"></span>
+                    </div>
+                    <div class="table-card">
+                        <table>
+                            <thead><tr><th>SKU</th><th>ARTIKEL</th><th>HPP</th></tr></thead>
+                            <tbody id="tabelHppMassal"><tr><td colspan="3" class="row-note">MEMUAT DATA...</td></tr></tbody>
+                        </table>
+                    </div>
+                    <div class="table-footer"><div id="paginationHppMassal" class="pagination"></div></div>
+                </div>
+
+                <!-- HALAMAN: KELOLA AKUN (DEVELOPER) -->
                 <div id="page-kelola-akun" class="page-section">
                     <div class="page-head">
-                        <div><h2>KELOLA AKUN STAFF</h2><p class="page-sub">DAFTAR AKUN DAN HAK AKSES PENGGUNA</p></div>
+                        <div><h2>KELOLA AKUN</h2><p class="page-sub">DAFTAR AKUN, UBAH ROLE, DAN RESET PASSWORD</p></div>
                         <button class="btn btn-primary" onclick="openModalUser()">+ TAMBAH AKUN BARU</button>
                     </div>
                     <div class="table-card">
@@ -590,7 +631,7 @@
                     </div>
                 </div>
 
-                <!-- HALAMAN: LOG AKTIVITAS (ADMIN) -->
+                <!-- HALAMAN: LOG AKTIVITAS (DEVELOPER & ADMIN) -->
                 <div id="page-log" class="page-section">
                     <div class="page-head"><div><h2>LOG AKTIVITAS SISTEM</h2><p class="page-sub">MAKSIMAL 500 AKTIVITAS TERAKHIR.</p></div></div>
                     <div class="table-card scroll">
@@ -736,14 +777,16 @@
     <!-- Modal Tambah User -->
     <div class="modal" id="modalUser">
         <div class="modal-content">
-            <h3>TAMBAH AKUN STAFF BARU</h3>
+            <h3>TAMBAH AKUN BARU</h3>
             <div class="input-group"><label>USERNAME (HURUF KECIL TANPA SPASI)</label><input type="text" id="userBaruUsername"></div>
-            <div class="input-group"><label>PASSWORD</label><input type="text" id="userBaruPassword"></div>
+            <div class="input-group"><label>PASSWORD</label><input type="password" id="userBaruPassword" autocomplete="new-password"></div>
             <div class="input-group">
                 <label>ROLE (HAK AKSES)</label>
                 <select id="userBaruRole">
-                    <option value="staff">STAFF (HANYA BISA SCAN)</option>
-                    <option value="admin">ADMIN (AKSES PENUH)</option>
+                    <option value="staff">STAFF (SCAN, RIWAYAT SCAN, REPORTS)</option>
+                    <option value="admin">ADMIN (SEMUA KECUALI MODE DEVELOPER &amp; KELOLA AKUN)</option>
+                    <option value="developer">DEVELOPER (AKSES PENUH)</option>
+                    <option value="demo">DEMO (HANYA MELIHAT)</option>
                 </select>
             </div>
             <div class="modal-actions">
@@ -753,6 +796,6 @@
         </div>
     </div>
 
-    <script src="app.js?v=5"></script>
+    <script src="app.js?v=8"></script>
 </body>
 </html>
