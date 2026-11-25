@@ -29,18 +29,42 @@ app.post('/api/login', (req, res) => {
   res.json({ success: true, token, user: { id: user.id, username: user.username, role: user.role } });
 });
 
-function authMiddleware(req, res, next) {
-  try {
-    const token = req.headers.authorization?.split(' ')[1];
-    req.user = jwt.verify(token, JWT_SECRET);
-    next();
-  } catch (err) { return res.status(401).json({ success: false, message: 'Token invalid' }); }
-}
+// 4 role: developer (semua fitur), admin (semua kecuali Mode Developer & Kelola Akun),
+// staff (scan + riwayat scan + Reports), demo (hanya lihat).
+const ROLE_VALID = ['developer', 'admin', 'staff', 'demo'];
 
-function adminMiddleware(req, res, next) {
-  if (req.user.role !== 'admin') return res.status(403).json({ success: false, message: 'Akses ditolak. Hanya Admin.' });
+function authMiddleware(req, res, next) {
+  let token;
+  try {
+    token = jwt.verify(req.headers.authorization?.split(' ')[1], JWT_SECRET);
+  } catch (err) { return res.status(401).json({ success: false, message: 'Token invalid' }); }
+  // Role dibaca dari database (bukan dari isi token), jadi perubahan role langsung berlaku
+  // dan akun yang sudah dihapus tidak bisa lagi memakai token lamanya.
+  const user = db.prepare('SELECT id, username, role FROM users WHERE id = ?').get(token.id);
+  if (!user) return res.status(401).json({ success: false, message: 'Akun tidak ditemukan. Silakan login ulang.' });
+  req.user = { id: user.id, username: user.username, role: user.role };
+  // Demo hanya boleh melihat: semua permintaan selain GET ditolak di server.
+  if (user.role === 'demo' && req.method !== 'GET') {
+    return res.status(403).json({ success: false, message: 'Akun Demo hanya bisa melihat, tidak bisa mengubah data.' });
+  }
   next();
 }
+
+function perluRole(...diizinkan) {
+  return (req, res, next) => {
+    if (!diizinkan.includes(req.user.role)) return res.status(403).json({ success: false, message: 'Akses ditolak. Role Anda tidak memiliki izin untuk fitur ini.' });
+    next();
+  };
+}
+// Developer + Admin (fitur admin biasa: stok, HPP satuan, tambah/hapus barang, upload SO, import, backup, Log Aktivitas)
+const adminMiddleware = perluRole('developer', 'admin');
+// Developer saja (Mode Developer: rincian, reset data, edit HPP massal; serta Kelola Akun)
+const developerMiddleware = perluRole('developer');
+
+// Data akun yang sedang login (role terbaru dari database) - dipakai frontend supaya perubahan role langsung terlihat
+app.get('/api/me', authMiddleware, (req, res) => {
+  res.json({ success: true, user: { id: req.user.id, username: req.user.username, role: req.user.role } });
+});
 
 function catatLog(userId, username, aksi, keterangan) {
   try { db.prepare('INSERT INTO log_aktivitas (user_id, username, aksi, keterangan) VALUES (?, ?, ?, ?)').run(userId, username, aksi, keterangan); } 
@@ -59,6 +83,95 @@ app.get('/api/barang/sku/:sku', authMiddleware, (req, res) => {
 app.put('/api/barang/:id/hpp', authMiddleware, adminMiddleware, (req, res) => {
   db.prepare('UPDATE barang SET hpp = ? WHERE id = ?').run(parseInt(req.body.hpp) || 0, req.params.id);
   res.json({ success: true });
+});
+
+// Edit HPP massal — developer saja. Hanya kolom HPP yang diubah; stok tidak pernah disentuh.
+app.put('/api/barang-hpp-massal', authMiddleware, developerMiddleware, (req, res) => {
+  const items = Array.isArray(req.body.items) ? req.body.items : [];
+  if (!items.length) return res.status(400).json({ success: false, message: 'Tidak ada perubahan HPP yang dikirim.' });
+  if (items.length > 2000) return res.status(400).json({ success: false, message: 'Maksimal 2000 SKU per penyimpanan.' });
+
+  const find = db.prepare('SELECT id, sku, hpp FROM barang WHERE LOWER(sku) = LOWER(?)');
+  const update = db.prepare('UPDATE barang SET hpp = ? WHERE id = ?');
+  const changes = [];
+  const tidakDitemukan = [];
+  const seen = new Set();
+
+  for (const item of items) {
+    const sku = String(item?.sku ?? '').trim();
+    const hpp = Number(String(item?.hpp ?? '').replace(/[^0-9-]/g, ''));
+    if (!sku || !Number.isInteger(hpp) || hpp < 0) continue;
+    const key = sku.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const barang = find.get(sku);
+    if (!barang) { tidakDitemukan.push(sku); continue; }
+    if (Number(barang.hpp) !== hpp) changes.push({ id: barang.id, sku: barang.sku, sebelum: Number(barang.hpp) || 0, sesudah: hpp });
+  }
+
+  const simpan = db.transaction(() => {
+    for (const c of changes) update.run(c.sesudah, c.id);
+  });
+  simpan();
+
+  if (changes.length) {
+    catatLog(req.user.id, req.user.username, 'EDIT HPP MASSAL', `Memperbarui HPP ${changes.length} SKU; tidak ditemukan ${tidakDitemukan.length}.`);
+  }
+  res.json({ success: true, updated: changes.length, notFound: tidakDitemukan, message: `HPP berhasil diperbarui: ${changes.length} SKU.` });
+});
+
+// Template Excel HPP massal — developer saja.
+app.get('/api/barang-hpp-massal/template', authMiddleware, developerMiddleware, (req, res) => {
+  const ws = xlsx.utils.aoa_to_sheet([['SKU', 'HPP'], ['CONTOH-SKU', 125000]]);
+  const wb = xlsx.utils.book_new();
+  xlsx.utils.book_append_sheet(wb, ws, 'HPP');
+  const buffer = xlsx.write(wb, { type: 'buffer', bookType: 'xlsx' });
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', 'attachment; filename=template_hpp_massal.xlsx');
+  res.send(buffer);
+});
+
+// Upload Excel HPP massal — format wajib: SKU, HPP. Stok tidak disentuh.
+app.post('/api/barang-hpp-massal/excel', authMiddleware, developerMiddleware, uploadMemori.single('file'), (req, res) => {
+  if (!req.file) return res.status(400).json({ success: false, message: 'File Excel belum dipilih.' });
+  try {
+    const wb = xlsx.read(req.file.buffer, { type: 'buffer' });
+    const sheet = wb.Sheets[wb.SheetNames[0]];
+    const rows = xlsx.utils.sheet_to_json(sheet, { defval: '' });
+    if (!rows.length) return res.status(400).json({ success: false, message: 'Excel kosong.' });
+
+    const find = db.prepare('SELECT id, sku, hpp FROM barang WHERE LOWER(sku) = LOWER(?)');
+    const update = db.prepare('UPDATE barang SET hpp = ? WHERE id = ?');
+    const changes = [];
+    const tidakDitemukan = [];
+    const invalid = [];
+    const seen = new Set();
+
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      const sku = String(row.SKU ?? row.sku ?? row['SKU (BARCODE)'] ?? '').trim();
+      const rawHpp = row.HPP ?? row.hpp ?? '';
+      const hpp = Number(String(rawHpp).replace(/[^0-9-]/g, ''));
+      if (!sku || rawHpp === '' || !Number.isInteger(hpp) || hpp < 0) { invalid.push(i + 2); continue; }
+      const key = sku.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const barang = find.get(sku);
+      if (!barang) { tidakDitemukan.push(sku); continue; }
+      if (Number(barang.hpp) !== hpp) changes.push({ id: barang.id, sku: barang.sku, sebelum: Number(barang.hpp) || 0, sesudah: hpp });
+    }
+
+    const simpan = db.transaction(() => {
+      for (const c of changes) update.run(c.sesudah, c.id);
+    });
+    simpan();
+
+    catatLog(req.user.id, req.user.username, 'UPLOAD HPP MASSAL', `Excel memperbarui ${changes.length} SKU; tidak ditemukan ${tidakDitemukan.length}; baris invalid ${invalid.length}.`);
+    res.json({ success: true, updated: changes.length, notFound: tidakDitemukan, invalidRows: invalid, message: `Upload selesai: ${changes.length} SKU diperbarui.` });
+  } catch (err) {
+    console.error('Gagal membaca Excel HPP massal:', err);
+    res.status(400).json({ success: false, message: 'File Excel tidak valid atau tidak bisa dibaca.' });
+  }
 });
 
 app.put('/api/barang/:id/stok', authMiddleware, adminMiddleware, (req, res) => {
@@ -85,18 +198,42 @@ app.delete('/api/barang/:id', authMiddleware, adminMiddleware, (req, res) => {
 });
 
 // ============ MANAJEMEN USER ============
-app.get('/api/users', authMiddleware, adminMiddleware, (req, res) => {
+app.get('/api/users', authMiddleware, developerMiddleware, (req, res) => {
   res.json({ success: true, data: db.prepare('SELECT id, username, role, created_at FROM users ORDER BY id ASC').all() });
 });
-app.post('/api/users', authMiddleware, adminMiddleware, (req, res) => {
-  const { username, password, role } = req.body;
+app.post('/api/users', authMiddleware, developerMiddleware, (req, res) => {
+  const { username, password } = req.body;
+  const role = req.body.role || 'staff';
   if (!username || !password) return res.status(400).json({ success: false, message: 'Username & Password wajib diisi' });
+  if (!ROLE_VALID.includes(role)) return res.status(400).json({ success: false, message: 'Role tidak valid' });
   try {
-    db.prepare('INSERT INTO users (username, password, role) VALUES (?, ?, ?)').run(username.toLowerCase(), bcrypt.hashSync(password, 10), role || 'staff');
+    db.prepare('INSERT INTO users (username, password, role) VALUES (?, ?, ?)').run(username.toLowerCase().trim(), bcrypt.hashSync(password, 10), role);
+    catatLog(req.user.id, req.user.username, 'TAMBAH AKUN', `${username.toLowerCase().trim()} (${role})`);
     res.json({ success: true });
   } catch (err) { res.status(400).json({ success: false, message: 'Username sudah ada' }); }
 });
-app.delete('/api/users/:id', authMiddleware, adminMiddleware, (req, res) => {
+// Ubah role dan/atau reset password akun lain (developer saja)
+app.put('/api/users/:id', authMiddleware, developerMiddleware, (req, res) => {
+  const target = db.prepare('SELECT id, username, role FROM users WHERE id = ?').get(req.params.id);
+  if (!target) return res.status(404).json({ success: false, message: 'Akun tidak ditemukan' });
+  const { role, password } = req.body;
+  if (role === undefined && !password) return res.status(400).json({ success: false, message: 'Tidak ada perubahan' });
+  if (role !== undefined) {
+    if (!ROLE_VALID.includes(role)) return res.status(400).json({ success: false, message: 'Role tidak valid' });
+    if (target.id === req.user.id && role !== target.role) return res.status(400).json({ success: false, message: 'Tidak bisa mengubah role akun sendiri' });
+  }
+  if (password && String(password).length < 6) return res.status(400).json({ success: false, message: 'Password minimal 6 karakter' });
+  db.transaction(() => {
+    if (role !== undefined) db.prepare('UPDATE users SET role = ? WHERE id = ?').run(role, target.id);
+    if (password) db.prepare('UPDATE users SET password = ? WHERE id = ?').run(bcrypt.hashSync(String(password), 10), target.id);
+  })();
+  const perubahan = [];
+  if (role !== undefined && role !== target.role) perubahan.push(`role ${target.role} -> ${role}`);
+  if (password) perubahan.push('reset password');
+  catatLog(req.user.id, req.user.username, 'UBAH AKUN', `${target.username}: ${perubahan.join(', ') || 'tanpa perubahan'}`);
+  res.json({ success: true });
+});
+app.delete('/api/users/:id', authMiddleware, developerMiddleware, (req, res) => {
   if (parseInt(req.params.id) === req.user.id) return res.status(400).json({ success: false, message: 'Tidak bisa hapus akun sendiri' });
   db.prepare('DELETE FROM users WHERE id = ?').run(req.params.id);
   res.json({ success: true });
@@ -125,7 +262,7 @@ app.get('/api/rincian', authMiddleware, (req, res) => {
   res.json({ success: true, data });
 });
 
-app.post('/api/rincian', authMiddleware, adminMiddleware, (req, res) => {
+app.post('/api/rincian', authMiddleware, developerMiddleware, (req, res) => {
   const grup = req.body.grup;
   if (!GRUP_RINCIAN.includes(grup)) return res.status(400).json({ success: false, message: 'Grup tidak valid' });
   const nama = normalisasiNama(grup, req.body.nama);
@@ -139,7 +276,7 @@ app.post('/api/rincian', authMiddleware, adminMiddleware, (req, res) => {
   res.json({ success: true });
 });
 
-app.put('/api/rincian/:id', authMiddleware, adminMiddleware, (req, res) => {
+app.put('/api/rincian/:id', authMiddleware, developerMiddleware, (req, res) => {
   const r = db.prepare('SELECT * FROM rincian WHERE id = ?').get(req.params.id);
   if (!r) return res.status(404).json({ success: false, message: 'Rincian tidak ditemukan' });
   const nama = normalisasiNama(r.grup, req.body.nama);
@@ -158,7 +295,7 @@ app.put('/api/rincian/:id', authMiddleware, adminMiddleware, (req, res) => {
   res.json({ success: true });
 });
 
-app.delete('/api/rincian/:id', authMiddleware, adminMiddleware, (req, res) => {
+app.delete('/api/rincian/:id', authMiddleware, developerMiddleware, (req, res) => {
   const r = db.prepare('SELECT * FROM rincian WHERE id = ?').get(req.params.id);
   if (!r) return res.status(404).json({ success: false, message: 'Rincian tidak ditemukan' });
   db.prepare('DELETE FROM rincian WHERE id = ?').run(r.id); // riwayat transaksi lama tidak dihapus
@@ -353,7 +490,7 @@ app.delete('/api/transaksi/:id', authMiddleware, (req, res) => {
 
 // ============ HAPUS SEMUA DATA (MODE DEVELOPER, ADMIN) ============
 // Menghapus semua riwayat transaksi & mereset stok. Akun, rincian (vendor/marketplace/dll) dan log aktivitas tetap ada.
-app.post('/api/reset-data', authMiddleware, adminMiddleware, (req, res) => {
+app.post('/api/reset-data', authMiddleware, developerMiddleware, (req, res) => {
   if (req.body.konfirmasi !== 'HAPUS SEMUA') return res.status(400).json({ success: false, message: 'Konfirmasi tidak sesuai' });
   const hapusBarang = req.body.hapus_barang === true;
   let jmlTrx = 0, jmlBarang = 0;
@@ -499,7 +636,7 @@ app.get('/api/dashboard-rekap', authMiddleware, (req, res) => {
 });
 
 // ============ LAPORAN OUTLET ============
-app.get('/api/laporan-outlet', authMiddleware, adminMiddleware, (req, res) => {
+app.get('/api/laporan-outlet', authMiddleware, (req, res) => {
   const startDate = req.query.start || new Date().toISOString().split('T')[0];
   const endDate = req.query.end || new Date().toISOString().split('T')[0];
   
@@ -520,7 +657,7 @@ app.get('/api/laporan-outlet', authMiddleware, adminMiddleware, (req, res) => {
 });
 
 // ============ LAPORAN COMPARE ============
-app.get('/api/laporan-compare', authMiddleware, adminMiddleware, (req, res) => {
+app.get('/api/laporan-compare', authMiddleware, (req, res) => {
   const { start1, end1, start2, end2 } = req.query;
   
   if (!start1 || !end1 || !start2 || !end2) {
@@ -540,7 +677,7 @@ app.get('/api/laporan-compare', authMiddleware, adminMiddleware, (req, res) => {
 });
 
 // ============ LAPORAN DAILY ============
-app.get('/api/laporan-daily', authMiddleware, adminMiddleware, (req, res) => {
+app.get('/api/laporan-daily', authMiddleware, (req, res) => {
   const startDate = req.query.start;
   const endDate = req.query.end;
   
@@ -563,7 +700,7 @@ app.get('/api/laporan-daily', authMiddleware, adminMiddleware, (req, res) => {
 });
 
 // ============ LAPORAN MONTHLY ============
-app.get('/api/laporan-monthly', authMiddleware, adminMiddleware, (req, res) => {
+app.get('/api/laporan-monthly', authMiddleware, (req, res) => {
   const startDate = req.query.start;
   const endDate = req.query.end;
   
@@ -586,7 +723,7 @@ app.get('/api/laporan-monthly', authMiddleware, adminMiddleware, (req, res) => {
 });
 
 // ============ LAPORAN BEST SELLER ============
-app.get('/api/laporan-bestseller', authMiddleware, adminMiddleware, (req, res) => {
+app.get('/api/laporan-bestseller', authMiddleware, (req, res) => {
   const startDate = req.query.start;
   const endDate = req.query.end;
   
